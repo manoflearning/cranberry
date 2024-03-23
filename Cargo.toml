@@ -1,0 +1,19 @@
+[package]
+name = "cranberry"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "cranberry"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.20.0", features = ["extension-module"] }
+ndarray = "0.15.6"
+numpy = "0.20.0"
+
+[profile.dev]
+opt-level = 3
+lto = true
+codegen-units = 1
