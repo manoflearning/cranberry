@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use ndarray::{s, ArrayBase, ArrayD, Dim, OwnedRepr};
+use ndarray::ArrayD;
 use numpy::{IxDyn, PyReadonlyArrayDyn};
 use std::collections::HashSet;
 use std::ops::{Add, Div, Mul, Neg, Sub};
@@ -8,7 +8,7 @@ use std::sync::{Arc, RwLock};
 
 use std::simd::f32x64;
 const BLOCK: usize = 64; // f32x64
-const BLOCK_Y: usize = 64;
+const BLOCK_Y: usize = 8;
 const BLOCK_X: usize = 16;
 
 pub static COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -18,7 +18,7 @@ pub struct RawTensor {
     id: usize,
     data: ArrayD<f32>,
     grad: ArrayD<f32>,
-    children: Vec<(TensorNode, ArrayD<f32>)>,
+    children: Vec<(TensorNode, ArrayD<f32>)>, // (child, weight) but do we need weight?
 }
 
 #[derive(Clone)]
@@ -29,35 +29,36 @@ impl TensorNode {
         TensorNode(Arc::new(RwLock::new(RawTensor {
             id: COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
             grad: ArrayD::zeros(data.raw_dim()),
-            data: data,
+            data,
             children: Vec::new(),
         })))
     }
 
     pub fn matmul(&self, other: &TensorNode) -> Self {
-        let self_data = self.0.read().unwrap().data.clone();
-        let other_data = other.0.read().unwrap().data.clone();
+        let self_dim = self.0.read().unwrap().data.raw_dim();
+        let other_dim = other.0.read().unwrap().data.raw_dim();
+        let dim_0 = self_dim[0];
+        let dim_1 = self_dim[1];
+        let dim_2 = other_dim[1];
 
-        assert_eq!(self_data.raw_dim()[1], other_data.raw_dim()[0], "Matrix dimensions must match");
+        assert_eq!(self_dim[1], other_dim[0], "Tensor dimensions must match");
 
-        let dim_0 = self_data.raw_dim()[0];
-        let dim_1 = self_data.raw_dim()[1];
-        let dim_2 = other_data.raw_dim()[1];
-
-        let mut out_data = ArrayD::<f32>::zeros(IxDyn(&[dim_0, dim_2]));
+        let self_data: Vec<f32> = self.0.read().unwrap().data.clone().into_raw_vec();
+        let other_data: Vec<f32> = other.0.read().unwrap().data.clone().into_raw_vec();
+        let mut out_data: Vec<f32> = vec![0.0; dim_0 * dim_2];
 
         // reference:
         // https://github.com/tinygrad/tinygrad/blob/master/extra/gemm/gemm.c
         for y in (0..dim_0).step_by(BLOCK_Y) {
             for x in (0..dim_2).step_by(BLOCK_X * BLOCK) {
-
+                
                 let mut acc = vec![f32x64::splat(0.0); BLOCK_Y * BLOCK_X];
 
                 for k in 0..dim_1 {
                     for iy in 0..BLOCK_Y {
-                        let ta = f32x64::splat(self_data[[y + iy, k]]);
+                        let ta = f32x64::splat(self_data[(y + iy) * dim_1 + k]);
                         for ix in 0..BLOCK_X {
-                            let tb = f32x64::from_slice(other_data.slice(s![k, x + ix * BLOCK..x + (ix + 1) * BLOCK]).as_slice().unwrap());
+                            let tb = f32x64::from_slice(&other_data[k * dim_2 + x + ix * BLOCK..k * dim_2 + x + (ix + 1) * BLOCK]);
                             acc[iy * BLOCK_X + ix] += ta * tb;
                         }
                     }
@@ -65,33 +66,16 @@ impl TensorNode {
 
                 for iy in 0..BLOCK_Y {
                     for ix in 0..BLOCK_X {
-                        let acc_slice = acc[iy * BLOCK_X + ix].as_array().as_slice();
-                        let acc_array = ArrayBase::<OwnedRepr<f32>, Dim<[usize; 1]>>::from_shape_vec((BLOCK,), acc_slice.to_vec()).unwrap();
-                        out_data.slice_mut(s![y + iy, x + ix * BLOCK..x + (ix + 1) * BLOCK]).assign(&acc_array);
+                        let acc_vec = acc[iy * BLOCK_X + ix].as_array().to_vec();
+                        let st = (y + iy) * dim_2 + x + ix * BLOCK;
+                        out_data.splice(st..st + BLOCK, acc_vec);
                     }
                 }
 
             }
         }
 
-        // naive simd implementation
-        // assert!(out_dim.2 % BLOCK == 0);
-        // for y in 0..out_dim.0 {
-        //     for x in (0..out_dim.2).step_by(BLOCK) { 
-        //         let mut acc = f32x64::splat(0.0);
-        //         for k in 0..out_dim.1 {
-        //             let a = f32x64::splat(self_data[[y, k]]);
-        //             let b = f32x64::from_slice(other_data.slice(s![k, x..x+BLOCK]).as_slice().unwrap());
-        //             acc += a * b;
-        //         }
-
-        //         let acc_slice = acc.as_array().as_slice();
-        //         let acc_array = ArrayBase::<OwnedRepr<f32>, Dim<[usize; 1]>>::from_shape_vec((BLOCK,), acc_slice.to_vec()).unwrap();
-        //         out_data.slice_mut(s![y, x..x+BLOCK]).assign(&acc_array);
-        //     }
-        // }
-
-        TensorNode::new(out_data)
+        TensorNode::new(ArrayD::from_shape_vec(IxDyn(&[dim_0, dim_2]), out_data).unwrap())
     }
 
     pub fn pow(&self, exp: f32) -> Self {
