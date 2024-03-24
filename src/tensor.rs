@@ -7,8 +7,8 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, RwLock};
 
 use std::simd::f32x64;
-const BLOCK: usize = 64; // f32x64
-const BLOCK_Y: usize = 8;
+const BLOCK: usize = 64;
+const BLOCK_Y: usize = 16;
 const BLOCK_X: usize = 16;
 
 pub static COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -35,16 +35,17 @@ impl TensorNode {
     }
 
     pub fn matmul(&self, other: &TensorNode) -> Self {
-        let self_dim = self.0.read().unwrap().data.raw_dim();
-        let other_dim = other.0.read().unwrap().data.raw_dim();
-        let dim_0 = self_dim[0];
-        let dim_1 = self_dim[1];
-        let dim_2 = other_dim[1];
+        let self_read = self.0.read().unwrap();
+        let other_read = other.0.read().unwrap();
 
-        assert_eq!(self_dim[1], other_dim[0], "Tensor dimensions must match");
+        let dim_0 = self_read.data.raw_dim()[0];
+        let dim_1 = self_read.data.raw_dim()[1];
+        let dim_2 = other_read.data.raw_dim()[1];
 
-        let self_data: Vec<f32> = self.0.read().unwrap().data.clone().into_raw_vec();
-        let other_data: Vec<f32> = other.0.read().unwrap().data.clone().into_raw_vec();
+        assert_eq!(self_read.data.raw_dim()[1], other_read.data.raw_dim()[0], "Tensor dimensions must match");
+
+        let self_data: Vec<f32> = self_read.data.clone().into_raw_vec();
+        let other_data: Vec<f32> = other_read.data.clone().into_raw_vec();
         let mut out_data: Vec<f32> = vec![0.0; dim_0 * dim_2];
 
         // reference:
