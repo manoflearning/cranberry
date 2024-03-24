@@ -201,7 +201,6 @@ pub struct Tensor(Tensor_);
 
 #[pymethods]
 impl Tensor {
-    // TODO: initialize directly from data
     #[new]
     fn new(data: PyReadonlyArrayDyn<f32>) -> Self {
         let data_array = data.as_array().to_owned();
