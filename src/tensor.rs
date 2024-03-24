@@ -3,7 +3,6 @@ use ndarray::ArrayD;
 use numpy::{IxDyn, PyReadonlyArrayDyn};
 use std::collections::HashSet;
 use std::ops::{Add, Div, Mul, Neg, Sub};
-use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, RwLock};
 
 use std::simd::f32x64;
@@ -11,23 +10,32 @@ const BLOCK: usize = 64;
 const BLOCK_Y: usize = 16;
 const BLOCK_X: usize = 16;
 
-pub static COUNTER: AtomicUsize = AtomicUsize::new(1);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct TensorId(usize);
 
-#[derive(Clone)]
-pub struct RawTensor {
-    id: usize,
-    data: ArrayD<f32>,
-    grad: ArrayD<f32>,
-    children: Vec<(TensorNode, ArrayD<f32>)>, // (child, weight) but do we need weight?
+impl TensorId {
+    fn new() -> Self {
+        use std::sync::atomic;
+        static COUNTER: atomic::AtomicUsize = atomic::AtomicUsize::new(1);
+        Self(COUNTER.fetch_add(1, atomic::Ordering::Relaxed))
+    }
 }
 
 #[derive(Clone)]
-pub struct TensorNode(pub Arc<RwLock<RawTensor>>);
+pub struct RawTensor {
+    id: TensorId,
+    data: ArrayD<f32>,
+    grad: ArrayD<f32>,
+    children: Vec<(Tensor_, ArrayD<f32>)>, // (child, weight) but do we need weight?
+}
 
-impl TensorNode {
+#[derive(Clone)]
+pub struct Tensor_(pub Arc<RwLock<RawTensor>>);
+
+impl Tensor_ {
     pub fn new(data: ArrayD<f32>) -> Self {
-        TensorNode(Arc::new(RwLock::new(RawTensor {
-            id: COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+        Tensor_(Arc::new(RwLock::new(RawTensor {
+            id: TensorId::new(),
             grad: ArrayD::zeros(data.raw_dim()),
             data,
             children: Vec::new(),
@@ -36,7 +44,7 @@ impl TensorNode {
 
     // slowwww matmul
     // numpy is 5.9x faster
-    pub fn matmul(&self, other: &TensorNode) -> Self {
+    pub fn matmul(&self, other: &Tensor_) -> Self {
         let self_read = self.0.read().unwrap();
         let other_read = other.0.read().unwrap();
 
@@ -78,13 +86,13 @@ impl TensorNode {
             }
         }
 
-        TensorNode::new(ArrayD::from_shape_vec(IxDyn(&[dim_0, dim_2]), out_data).unwrap())
+        Tensor_::new(ArrayD::from_shape_vec(IxDyn(&[dim_0, dim_2]), out_data).unwrap())
     }
 
     pub fn pow(&self, exp: f32) -> Self {
         let data = self.0.read().unwrap().data.clone();
         let out_data = data.mapv(|x| x.powf(exp));
-        let out = TensorNode::new(out_data);
+        let out = Tensor_::new(out_data);
         {
             let mut out_inner = out.0.write().unwrap();
             out_inner.children.push((self.clone(), data.mapv(|x| exp * x.powf(exp - 1.0))));
@@ -93,10 +101,10 @@ impl TensorNode {
     }
 
     pub fn backward(&self) {
-        let mut topo: Vec<TensorNode> = Vec::new();
-        let mut visited: HashSet<usize> = HashSet::new();
+        let mut topo: Vec<Tensor_> = Vec::new();
+        let mut visited: HashSet<TensorId> = HashSet::new();
 
-        fn build_topo(v: TensorNode, topo: &mut Vec<TensorNode>, visited: &mut HashSet<usize>) {
+        fn build_topo(v: Tensor_, topo: &mut Vec<Tensor_>, visited: &mut HashSet<TensorId>) {
             visited.insert(v.0.read().unwrap().id);
             for (child, _) in v.0.read().unwrap().children.iter() {
                 if !visited.contains(&child.0.read().unwrap().id) {
@@ -119,9 +127,9 @@ impl TensorNode {
     }
 }
 
-impl Add<TensorNode> for TensorNode {
-    type Output = TensorNode;
-    fn add(self, other: TensorNode) -> Self::Output {
+impl Add<Tensor_> for Tensor_ {
+    type Output = Tensor_;
+    fn add(self, other: Tensor_) -> Self::Output {
         let self_data = self.0.read().unwrap().data.clone();
         let other_data = other.0.read().unwrap().data.clone();
 
@@ -132,7 +140,7 @@ impl Add<TensorNode> for TensorNode {
         );
 
         let out_data = &self_data + &other_data;
-        let out = TensorNode::new(out_data);
+        let out = Tensor_::new(out_data);
         {
             let mut out_inner = out.0.write().unwrap();
             out_inner.children.push((self.clone(), ArrayD::ones(self_data.raw_dim())));
@@ -142,14 +150,14 @@ impl Add<TensorNode> for TensorNode {
     }
 }
 
-impl Sub<TensorNode> for TensorNode {
-    type Output = TensorNode;
-    fn sub(self, other: TensorNode) -> Self::Output { self + -other }
+impl Sub<Tensor_> for Tensor_ {
+    type Output = Tensor_;
+    fn sub(self, other: Tensor_) -> Self::Output { self + -other }
 }
 
-impl Mul<TensorNode> for TensorNode {
-    type Output = TensorNode;
-    fn mul(self, other: TensorNode) -> Self::Output {
+impl Mul<Tensor_> for Tensor_ {
+    type Output = Tensor_;
+    fn mul(self, other: Tensor_) -> Self::Output {
         let self_data = self.0.read().unwrap().data.clone();
         let other_data = other.0.read().unwrap().data.clone();
 
@@ -160,7 +168,7 @@ impl Mul<TensorNode> for TensorNode {
         );
 
         let out_data = &self_data * &other_data;
-        let out = TensorNode::new(out_data);
+        let out = Tensor_::new(out_data);
         {
             let mut out_inner = out.0.write().unwrap();
             out_inner.children.push((self.clone(), other_data.clone()));
@@ -170,16 +178,16 @@ impl Mul<TensorNode> for TensorNode {
     }
 }
 
-impl Div<TensorNode> for TensorNode {
-    type Output = TensorNode;
-    fn div(self, other: TensorNode) -> Self::Output { self * other.pow(-1.0) }
+impl Div<Tensor_> for Tensor_ {
+    type Output = Tensor_;
+    fn div(self, other: Tensor_) -> Self::Output { self * other.pow(-1.0) }
 }
 
-impl Neg for TensorNode {
-    type Output = TensorNode;
+impl Neg for Tensor_ {
+    type Output = Tensor_;
     fn neg(self) -> Self::Output {
         let data = self.0.read().unwrap().data.clone();
-        let out = TensorNode::new(-&data);
+        let out = Tensor_::new(-&data);
         {
             let mut out_inner = out.0.write().unwrap();
             out_inner.children.push((self.clone(), -ArrayD::ones(data.raw_dim())));
@@ -189,7 +197,7 @@ impl Neg for TensorNode {
 }
 
 #[pyclass]
-pub struct Tensor { ts: TensorNode, }
+pub struct Tensor(Tensor_);
 
 #[pymethods]
 impl Tensor {
@@ -197,20 +205,20 @@ impl Tensor {
     #[new]
     fn new(data: PyReadonlyArrayDyn<f32>) -> Self {
         let data_array = data.as_array().to_owned();
-        Tensor { ts: TensorNode::new(data_array) }
+        Tensor(Tensor_::new(data_array))
     }
 
-    fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor { ts: self.ts.matmul(&other.ts) }) }
-    fn matmul(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor { ts: self.ts.matmul(&other.ts) }) }
+    fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor(self.0.matmul(&other.0))) }
+    fn matmul(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor(self.0.matmul(&other.0))) }
     
-    fn backward(&self) -> PyResult<()> { self.ts.backward(); Ok(()) }
+    fn backward(&self) -> PyResult<()> { self.0.backward(); Ok(()) }
 
-    fn __repr__(&self) -> PyResult<String> { Ok(format!("Tensor({:?})", self.ts.0.read().unwrap().data)) }
+    fn __repr__(&self) -> PyResult<String> { Ok(format!("Tensor({:?})", self.0.0.read().unwrap().data)) }
 
-    fn __add__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor { ts: self.ts.clone() + other.ts.clone() }) }
-    fn __sub__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor { ts: self.ts.clone() - other.ts.clone() }) }
-    fn __mul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor { ts: self.ts.clone() * other.ts.clone() }) }
-    fn __truediv__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor { ts: self.ts.clone() / other.ts.clone() }) }
+    fn __add__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor(self.0.clone() + other.0.clone())) }
+    fn __sub__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor(self.0.clone() - other.0.clone())) }
+    fn __mul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor(self.0.clone() * other.0.clone())) }
+    fn __truediv__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor(self.0.clone() / other.0.clone())) }
     
-    fn __neg__(&self) -> PyResult<Tensor> { Ok(Tensor { ts: -self.ts.clone() }) }
+    fn __neg__(&self) -> PyResult<Tensor> { Ok(Tensor(-self.0.clone())) }
 }
