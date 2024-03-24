@@ -5,7 +5,7 @@ import numpy as np
 import cranberry as cr
 import time
 
-N = 1024
+N = 2048
 
 if __name__ == '__main__':
     flop = N*N*2*N

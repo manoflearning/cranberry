@@ -34,6 +34,8 @@ impl TensorNode {
         })))
     }
 
+    // slowwww matmul
+    // numpy is 5.9x faster
     pub fn matmul(&self, other: &TensorNode) -> Self {
         let self_read = self.0.read().unwrap();
         let other_read = other.0.read().unwrap();
@@ -52,7 +54,7 @@ impl TensorNode {
         // https://github.com/tinygrad/tinygrad/blob/master/extra/gemm/gemm.c
         for y in (0..dim_0).step_by(BLOCK_Y) {
             for x in (0..dim_2).step_by(BLOCK_X * BLOCK) {
-                
+            
                 let mut acc = vec![f32x64::splat(0.0); BLOCK_Y * BLOCK_X];
 
                 for k in 0..dim_1 {
@@ -67,7 +69,7 @@ impl TensorNode {
 
                 for iy in 0..BLOCK_Y {
                     for ix in 0..BLOCK_X {
-                        let acc_vec = acc[iy * BLOCK_X + ix].as_array().to_vec();
+                        let acc_vec = acc[iy * BLOCK_X + ix].to_array();
                         let st = (y + iy) * dim_2 + x + ix * BLOCK;
                         out_data.splice(st..st + BLOCK, acc_vec);
                     }
