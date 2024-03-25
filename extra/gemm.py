@@ -2,7 +2,6 @@ import os
 os.environ['OMP_NUM_THREADS'] = '1'
 
 import numpy as np
-import torch
 import cranberry as cr
 import time
 
@@ -20,15 +19,6 @@ if __name__ == '__main__':
     et = time.monotonic()
     s_np = et - st
     print(f'NumPy:\t\t{flop / s_np * 1e-9:.2f} GFLOP/S')
-
-    # pytorch
-    U = torch.tensor(A)
-    V = torch.tensor(B)
-    st = time.monotonic()
-    W = U @ V
-    et = time.monotonic()
-    s_pt = et - st
-    print(f'PyTorch:\t{flop / s_pt * 1e-9:.2f} GFLOP/S')
 
     # cranberry
     P = cr.Tensor(A)
