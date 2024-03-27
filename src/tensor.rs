@@ -41,15 +41,6 @@ impl Tensor {
         })))
     }
 
-    // https://pytorch.org/docs/stable/generated/torch.equal.html
-    fn equal_(a: &Tensor, b: &Tensor) -> bool {
-        let a_read = a.0.read().unwrap();
-        let b_read = b.0.read().unwrap();
-        if a_read.data != b_read.data { return false; }
-        if a_read.shape != b_read.shape { return false; }
-        true
-    }
-
     fn modify_grad_(&self) {
         if let Some(op) = &self.0.read().unwrap().op {
             if op == "broadcast" {
@@ -245,6 +236,15 @@ impl Tensor {
     }
 }
 
+impl PartialEq for Tensor {
+    // https://pytorch.org/docs/stable/generated/torch.equal.html
+    fn eq(&self, other: &Self) -> bool {
+        if self.0.read().unwrap().data != other.0.read().unwrap().data { return false; }
+        if self.0.read().unwrap().shape != other.0.read().unwrap().shape { return false; }
+        true
+    }
+}
+
 // ******************** unary ops *************************
 
 impl Tensor {
@@ -424,7 +424,7 @@ impl Tensor {
     // TODO: we need better __repr__
     fn __repr__(&self) -> PyResult<String> { Ok(format!("Tensor(data={:?}, shape={:?})", self.0.read().unwrap().data, self.0.read().unwrap().shape)) }
 
-    fn __eq__(&self, other: &Tensor) -> PyResult<bool> { Ok(Tensor::equal_(self, &other)) }
+    fn __eq__(&self, other: &Tensor) -> PyResult<bool> { Ok(self == other) }
 
     fn backward(&self) -> PyResult<()> { Ok(self.backward_()) }
 
