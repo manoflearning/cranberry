@@ -5,7 +5,7 @@ import numpy as np
 import cranberry as cr
 import time
 
-N = 2048
+N = 1024
 
 if __name__ == '__main__':
     flop = N*N*2*N
@@ -29,5 +29,5 @@ if __name__ == '__main__':
     s_cr = et - st
     print(f'Cranberry:\t{flop / s_cr * 1e-9:.2f} GFLOP/S')
 
-    # check
+    # speed check
     print(f'Speedup:\t{s_np / s_cr:.2f}x')
