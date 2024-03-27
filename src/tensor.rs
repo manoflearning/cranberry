@@ -1,20 +1,13 @@
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyFloat, PyList};
-use ndarray::ArrayD;
-use numpy::{IxDyn, PyReadonlyArrayDyn};
-use std::collections::HashSet;
-use std::ops::{Add, Div, Mul, Neg, Sub};
-use std::sync::{Arc, RwLock};
-use rand::prelude::*;
+// - broadcasting
+// - various ops
+// - correct backprop
+// - do not use ndarray
 
-use std::simd::f32x64;
-const BLOCK: usize = 64;
-const BLOCK_Y: usize = 16;
-const BLOCK_X: usize = 16;
+use pyo3::prelude::*;
+use std::{collections::HashSet, ops::{Add, Div, Mul, Neg, Sub}, sync::{Arc, RwLock}};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct TensorId(usize);
-
+struct TensorId(usize);
 impl TensorId {
     fn new() -> Self {
         use std::sync::atomic;
@@ -24,33 +17,51 @@ impl TensorId {
 }
 
 #[derive(Clone)]
-pub struct RawTensor {
+struct Tensor_ {
     id: TensorId,
-    data: ArrayD<f32>,
-    grad: ArrayD<f32>,
-    children: Vec<(Tensor_, ArrayD<f32>)>, // (child, weight) but do we need weight?
+    data: Vec<f32>,
+    grad: Vec<f32>,
+    shape: Vec<usize>,
+    op: Option<String>,
+    children: Vec<Tensor>,
 }
 
+#[pyclass]
 #[derive(Clone)]
-pub struct Tensor_(pub Arc<RwLock<RawTensor>>);
+pub struct Tensor(Arc<RwLock<Tensor_>>);
 
-impl Tensor_ {
-    pub fn new(data: ArrayD<f32>) -> Self {
-        Tensor_(Arc::new(RwLock::new(RawTensor {
+impl Tensor {
+    fn new(data: Vec<f32>, shape: Vec<usize>, op: Option<String>) -> Self {
+        let len = data.len();
+        Tensor(Arc::new(RwLock::new(Tensor_ {
             id: TensorId::new(),
-            grad: ArrayD::zeros(data.raw_dim()),
             data,
-            children: Vec::new(),
+            grad: vec![0.0; len],
+            shape,
+            op,
+            children: vec![],
         })))
     }
 
-    pub fn backward(&self) {
-        let mut topo: Vec<Tensor_> = Vec::new();
+    fn modify_grad(&self) {
+        if let Some(op) = &self.0.read().unwrap().op {
+            if op == "broadcast" { unimplemented!() }
+            else if op == "pow" { unimplemented!() }
+            else if op == "relu" { unimplemented!() }
+            else if op == "neg" { unimplemented!() }
+            else if op == "add" { unimplemented!() }
+            else if op == "mul" { unimplemented!() }
+            else if op == "matmul" { unimplemented!() }
+            else { panic!("Unknown op: {}", op); }
+        }
+    }
+    fn backward_(&self) {
+        let mut topo: Vec<Tensor> = vec![];
         let mut visited: HashSet<TensorId> = HashSet::new();
 
-        fn build_topo(v: Tensor_, topo: &mut Vec<Tensor_>, visited: &mut HashSet<TensorId>) {
+        fn build_topo(v: Tensor, topo: &mut Vec<Tensor>, visited: &mut HashSet<TensorId>) {
             visited.insert(v.0.read().unwrap().id);
-            for (child, _) in v.0.read().unwrap().children.iter() {
+            for child in &v.0.read().unwrap().children {
                 if !visited.contains(&child.0.read().unwrap().id) {
                     build_topo(child.clone(), topo, visited);
                 }
@@ -58,138 +69,168 @@ impl Tensor_ {
             topo.push(v);
         }
         build_topo(self.clone(), &mut topo, &mut visited);
+
+        let init_grad: Vec<f32> = vec![1.0; self.0.read().unwrap().data.len()];
+        self.0.write().unwrap().grad = init_grad;
+        for v in topo.iter().rev() { v.modify_grad(); }
+    }
+
+    fn uniform_(shape: Vec<usize>, low: f32, high: f32, seed: Option<u64>) -> Tensor {
+        unimplemented!()
+    }
+
+    // https://pytorch.org/docs/stable/_modules/torch/nn/init.html#kaiming_uniform_
+    fn kaiming_uniform_(shape: Vec<usize>, a: f32, seed: Option<u64>) -> Tensor {
+        unimplemented!()
+    }
+
+    // https://numpy.org/doc/stable/user/basics.broadcasting.html
+    // TODO: currently naive, slow, and memory inefficient implementation
+    fn broadcast_(&self, other: Tensor) -> (Tensor, Tensor) {
+        let mut self_shape = self.0.read().unwrap().shape.clone();
+        let mut other_shape = other.0.read().unwrap().shape.clone();
         
-        let self_dim = self.0.read().unwrap().data.raw_dim();
-        self.0.write().unwrap().grad = ArrayD::ones(self_dim);
-        for v in topo.iter().rev() {
-            let grad = v.0.read().unwrap().grad.clone();
-            for (child, weight) in v.0.read().unwrap().children.iter() {
-                let child_grad = child.0.read().unwrap().grad.clone();
-                child.0.write().unwrap().grad = child_grad + grad.clone() * weight.clone();
+        while self_shape.len() < other_shape.len() {
+            self_shape.insert(0, 1);
+        }
+        while other_shape.len() < self_shape.len() {
+            other_shape.insert(0, 1);
+        }
+
+        let mut out_shape: Vec<usize> = vec![];
+        for (s, o) in self_shape.iter().zip(other_shape.iter()) {
+            if s == o { out_shape.push(*s); }
+            else if *s == 1 { out_shape.push(*o); }
+            else if *o == 1 { out_shape.push(*s); }
+            else { panic!("Tensor dimensions must match"); }
+        }
+
+        if out_shape == self_shape && out_shape == other_shape {
+            return (self.clone(), other.clone());
+        }
+
+        let mut self_data_br: Vec<f32> = vec![0.0; out_shape.iter().product::<usize>() as usize];
+        let mut other_data_br: Vec<f32> = vec![0.0; out_shape.iter().product::<usize>() as usize];
+
+        fn fill_data(idx: usize, data: &Vec<f32>, shape: &Vec<usize>, out_idx: usize, out_data: &mut Vec<f32>, out_shape: &Vec<usize>) {
+            if idx == shape.len() { out_data[out_idx] = data[idx]; return; }
+
+            for i in 0..out_shape[idx] {
+                let n_idx = idx * shape[idx] + (i % shape[idx]);
+                let n_out_idx = out_idx * out_shape[idx] + i;
+                fill_data(n_idx, data, shape, n_out_idx, out_data, out_shape);
             }
         }
-    }
+        fill_data(0, &self.0.read().unwrap().data, &self_shape, 0, &mut self_data_br, &out_shape);
+        fill_data(0, &other.0.read().unwrap().data, &other_shape, 0, &mut other_data_br, &out_shape);
+        
+        let self_br = Tensor::new(self_data_br, out_shape.clone(), Some("broadcast".to_string()));
+        let other_br = Tensor::new(other_data_br, out_shape.clone(), Some("broadcast".to_string()));
+        {
+            self_br.0.write().unwrap().children.push(self.clone());
+            other_br.0.write().unwrap().children.push(other.clone());
+        }
 
-    pub fn uniform(shape: Vec<usize>, low: f32, high: f32, seed: Option<u64>) -> Tensor_ {
-        let mut rng = match seed {
-            Some(seed) => StdRng::seed_from_u64(seed),
-            None => StdRng::from_entropy(),
-        };
-        let data = ArrayD::from_shape_fn(IxDyn(&shape), |_| rng.gen_range(low..high));
-        Tensor_::new(data)
-    }
-
-    // TODO: implement the correct kaiming_uniform https://pytorch.org/docs/stable/_modules/torch/nn/init.html#kaiming_uniform_
-    pub fn kaiming_uniform(shape: Vec<usize>, a: f32, seed: Option<u64>) -> Tensor_ {
-        let bound = (3.0_f32).sqrt() * (2.0 / (1.0 + a.powf(2.0))) / (shape[1] as f32).sqrt();
-        Tensor_::uniform(shape, -bound, bound, seed)
+        (self_br, other_br)
     }
 }
 
-// ************************* unary ops *************************
+// ******************** unary ops *************************
 
-impl Tensor_ {
-    pub fn pow(&self, exp: f32) -> Self {
-        let data = self.0.read().unwrap().data.clone();
-        let out_data = data.mapv(|x| x.powf(exp));
-        let out = Tensor_::new(out_data);
+impl Tensor {
+    fn pow_(&self, exp: f32) -> Tensor {
+        let data: Vec<f32> = self.0.read().unwrap().data.iter().map(|x| x.powf(exp)).collect();
+        let out = Tensor::new(data, self.0.read().unwrap().shape.clone(), Some("pow".to_string()));
         {
-            let mut out_inner = out.0.write().unwrap();
-            out_inner.children.push((self.clone(), data.mapv(|x| exp * x.powf(exp - 1.0))));
+            out.0.write().unwrap().children.push(self.clone());
+        }
+        out
+    }
+
+    fn relu_(&self) -> Tensor {
+        let data: Vec<f32> = self.0.read().unwrap().data.iter().map(|x| x.max(0.0)).collect();
+        let out = Tensor::new(data, self.0.read().unwrap().shape.clone(), Some("relu".to_string()));
+        {
+            out.0.write().unwrap().children.push(self.clone());
         }
         out
     }
 }
 
-impl Neg for Tensor_ {
-    type Output = Tensor_;
+impl Neg for Tensor {
+    type Output = Tensor;
     fn neg(self) -> Self::Output {
-        let data = self.0.read().unwrap().data.clone();
-        let out = Tensor_::new(-&data);
+        let data: Vec<f32> = self.0.read().unwrap().data.iter().map(|x| -x).collect();
+        let out = Tensor::new(data, self.0.read().unwrap().shape.clone(), Some("neg".to_string()));
         {
-            let mut out_inner = out.0.write().unwrap();
-            out_inner.children.push((self.clone(), -ArrayD::ones(data.raw_dim())));
+            out.0.write().unwrap().children.push(self.clone());
         }
         out
     }
 }
 
-// ************************* binary ops *************************
+// ******************** binary ops ************************
 
-impl Add<Tensor_> for Tensor_ {
-    type Output = Tensor_;
-    fn add(self, other: Tensor_) -> Self::Output {
-        let self_data = self.0.read().unwrap().data.clone();
-        let other_data = other.0.read().unwrap().data.clone();
-
-        assert_eq!(
-            self_data.raw_dim(),
-            other_data.raw_dim(),
-            "Tensor dimensions must match"
-        );
-
-        let out_data = &self_data + &other_data;
-        let out = Tensor_::new(out_data);
+impl Add<Tensor> for Tensor {
+    type Output = Tensor;
+    fn add(self, other: Tensor) -> Self::Output {
+        let (self_br, other_br) = self.broadcast_(other);
+        let data: Vec<f32> = self_br.0.read().unwrap().data.iter().zip(other_br.0.read().unwrap().data.iter()).map(|(x, y)| x + y).collect();
+        let out = Tensor::new(data, self_br.0.read().unwrap().shape.clone(), Some("add".to_string()));
         {
-            let mut out_inner = out.0.write().unwrap();
-            out_inner.children.push((self.clone(), ArrayD::ones(self_data.raw_dim())));
-            out_inner.children.push((other.clone(), ArrayD::ones(other_data.raw_dim())));
+            out.0.write().unwrap().children.push(self_br);
+            out.0.write().unwrap().children.push(other_br);
         }
         out
     }
 }
 
-impl Sub<Tensor_> for Tensor_ {
-    type Output = Tensor_;
-    fn sub(self, other: Tensor_) -> Self::Output { self + -other }
+impl Sub<Tensor> for Tensor {
+    type Output = Tensor;
+    fn sub(self, other: Tensor) -> Self::Output { self + (-other) }
 }
 
-impl Mul<Tensor_> for Tensor_ {
-    type Output = Tensor_;
-    fn mul(self, other: Tensor_) -> Self::Output {
-        let self_data = self.0.read().unwrap().data.clone();
-        let other_data = other.0.read().unwrap().data.clone();
-
-        assert_eq!(
-            self_data.raw_dim(),
-            other_data.raw_dim(),
-            "Tensor dimensions must match"
-        );
-
-        let out_data = &self_data * &other_data;
-        let out = Tensor_::new(out_data);
+impl Mul<Tensor> for Tensor {
+    type Output = Tensor;
+    fn mul(self, other: Tensor) -> Self::Output {
+        let (self_br, other_br) = self.broadcast_(other);
+        let data: Vec<f32> = self_br.0.read().unwrap().data.iter().zip(other_br.0.read().unwrap().data.iter()).map(|(x, y)| x * y).collect();
+        let out = Tensor::new(data, self_br.0.read().unwrap().shape.clone(), Some("mul".to_string()));
         {
-            let mut out_inner = out.0.write().unwrap();
-            out_inner.children.push((self.clone(), other_data.clone()));
-            out_inner.children.push((other.clone(), self_data.clone()));
+            out.0.write().unwrap().children.push(self_br);
+            out.0.write().unwrap().children.push(other_br);
         }
         out
     }
 }
 
-impl Div<Tensor_> for Tensor_ {
-    type Output = Tensor_;
-    fn div(self, other: Tensor_) -> Self::Output { self * other.pow(-1.0) }
+impl Div<Tensor> for Tensor {
+    type Output = Tensor;
+    fn div(self, other: Tensor) -> Self::Output { self * other.pow_(-1.0) }
 }
 
-impl Tensor_ {
-    // slowwww matmul
-    // numpy is 5.9x faster
-    pub fn matmul(&self, other: &Tensor_) -> Self {
+use std::simd::f32x64;
+const BLOCK: usize = 64;
+const BLOCK_Y: usize = 16;
+const BLOCK_X: usize = 16;
+
+impl Tensor {
+    // slowwww matmul, numpy is 5.9x faster
+    // TODO: support nD tensors
+    fn matmul_(&self, other: Tensor) -> Tensor {
         let self_read = self.0.read().unwrap();
         let other_read = other.0.read().unwrap();
 
-        let dim_0 = self_read.data.raw_dim()[0];
-        let dim_1 = self_read.data.raw_dim()[1];
-        let dim_2 = other_read.data.raw_dim()[1];
+        let dim_0 = self_read.shape[0];
+        let dim_1 = self_read.shape[1];
+        let dim_2 = other_read.shape[1];
 
-        assert_eq!(self_read.data.raw_dim()[1], other_read.data.raw_dim()[0], "Tensor dimensions must match");
+        assert_eq!(self_read.shape[1], other_read.shape[0], "Tensor dimensions must match");
 
-        let self_data: Vec<f32> = self_read.data.clone().into_raw_vec();
-        let other_data: Vec<f32> = other_read.data.clone().into_raw_vec();
+        let self_data = self_read.data.clone();
+        let other_data = other_read.data.clone();
         let mut out_data: Vec<f32> = vec![0.0; dim_0 * dim_2];
 
-        // reference:
         // https://github.com/tinygrad/tinygrad/blob/master/extra/gemm/gemm.c
         for y in (0..dim_0).step_by(BLOCK_Y) {
             for x in (0..dim_2).step_by(BLOCK_X * BLOCK) {
@@ -217,50 +258,77 @@ impl Tensor_ {
             }
         }
 
-        Tensor_::new(ArrayD::from_shape_vec(IxDyn(&[dim_0, dim_2]), out_data).unwrap())
+        let out = Tensor::new(out_data, vec![dim_0, dim_2], Some("matmul".to_string()));
+        {
+            out.0.write().unwrap().children.push(self.clone());
+            out.0.write().unwrap().children.push(other.clone());
+        }
+        out
     }
 }
 
-// ************************* functional nn ops *************************
+// ******************** functional nn ops *****************
 
-impl Tensor_ {
-    pub fn linear(&self, weight: &Tensor_, bias: &Option<Tensor_>) -> Tensor_ {
-        let mut x = self.matmul(weight);
-        if let Some(b) = bias { x = x.add(b.clone()); }
-        x
+impl Tensor {
+    fn linear_(&self, weight: Tensor, bias: Option<Tensor>) -> Tensor {
+        let mut out =  self.matmul_(weight);
+        if let Some(bias) = bias { out = out + bias; }
+        out
     }
 }
 
-// ************************* python wrapper *************************
+// ******************** python wrapper ********************
 
-#[pyclass]
-#[derive(Clone)]
-pub struct Tensor(pub Tensor_);
+// TODO: implement the conversion that can detect the wrong shape
+#[derive(FromPyObject)]
+enum List<T> { Vector(Vec<List<T>>), Item(T), }
+#[pyfunction]
+fn process_list(list: List<f32>) -> (Vec<f32>, Vec<usize>) {
+    match list {
+        List::Vector(v) => {
+            let mut data: Vec<f32> = vec![];
+            let mut shape: Vec<usize> = vec![];
+            shape.push(v.len());
+            for item in v {
+                let (d, s) = process_list(item);
+                data.extend(d);
+                if shape.len() == 1 {
+                    shape.extend(s);
+                }
+            }
+            (data, shape)
+        }
+        List::Item(i) => (vec![i as f32], vec![]),
+    }
+}
 
 #[pymethods]
 impl Tensor {
     #[new]
-    fn new(data: PyReadonlyArrayDyn<f32>) -> Self {
-        let data_array = data.as_array().to_owned();
-        Tensor(Tensor_::new(data_array))
+    fn __init__(data: List<f32>) -> PyResult<Self> {
+        let (data, shape) = process_list(data);
+        Ok(Self::new(data, shape, None))
     }
 
-    fn __repr__(&self) -> PyResult<String> { Ok(format!("Tensor({:?})", self.0.0.read().unwrap().data)) }
+    // TODO: we need better __repr__
+    fn __repr__(&self) -> PyResult<String> { Ok(format!("Tensor(data={:?}, shape={:?})", self.0.read().unwrap().data, self.0.read().unwrap().shape)) }
+
+    fn backward(&self) -> PyResult<()> { Ok(self.backward_()) }
+
+    // unary ops
+    fn pow(&self, exp: f32) -> PyResult<Tensor> { Ok(self.pow_(exp)) }
+    fn relu(&self) -> PyResult<Tensor> { Ok(self.relu_()) }
+    fn __neg__(&self) -> PyResult<Tensor> { Ok(-self.clone()) }
+
+    // binary ops
+    fn __add__(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.clone() + other.clone()) }
+    fn __sub__(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.clone() - other.clone()) }
+    fn __mul__(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.clone() * other.clone()) }
+    fn __truediv__(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.clone() / other.clone()) }
+    fn __matmul__(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.matmul_(other)) }
+    fn matmul(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.matmul_(other)) }
+    fn dot(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.matmul_(other)) }
     
-    fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor(self.0.matmul(&other.0))) }
-    fn matmul(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor(self.0.matmul(&other.0))) }
-    fn dot(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor(self.0.matmul(&other.0))) }
-    
-    fn backward(&self) -> PyResult<()> { self.0.backward(); Ok(()) }
-
-    fn __add__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor(self.0.clone() + other.0.clone())) }
-    fn __sub__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor(self.0.clone() - other.0.clone())) }
-    fn __mul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor(self.0.clone() * other.0.clone())) }
-    fn __truediv__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(Tensor(self.0.clone() / other.0.clone())) }
-
-    fn __neg__(&self) -> PyResult<Tensor> { Ok(Tensor(-self.0.clone())) }
-
-    fn linear(&self, weight: &Tensor, bias: Option<Tensor>) -> PyResult<Tensor> {
-        Ok(Tensor(self.0.linear(&weight.0, &bias.map(|b| b.0))))
-    }
+    // functional nn ops
+    fn linear(&self, weight: Tensor, bias: Option<Tensor>) -> PyResult<Tensor> { Ok(self.linear_(weight, bias)) }
 }
