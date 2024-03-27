@@ -4,6 +4,7 @@
 // - do not use ndarray
 
 use pyo3::prelude::*;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{collections::HashSet, ops::{Add, Div, Mul, Neg, Sub}, sync::{Arc, RwLock}};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -23,6 +24,7 @@ struct Tensor_ {
     grad: Vec<f32>,
     shape: Vec<usize>,
     op: Option<String>,
+    ctx: Option<f32>,
     children: Vec<Tensor>,
 }
 
@@ -39,19 +41,116 @@ impl Tensor {
             grad: vec![0.0; len],
             shape,
             op,
+            ctx: None,
             children: vec![],
         })))
     }
 
     fn modify_grad(&self) {
         if let Some(op) = &self.0.read().unwrap().op {
-            if op == "broadcast" { unimplemented!() }
-            else if op == "pow" { unimplemented!() }
-            else if op == "relu" { unimplemented!() }
-            else if op == "neg" { unimplemented!() }
-            else if op == "add" { unimplemented!() }
-            else if op == "mul" { unimplemented!() }
-            else if op == "matmul" { unimplemented!() }
+            if op == "broadcast" {
+                fn fill_grad(idx: usize, grad: &Vec<f32>, shape: &Vec<usize>, chd_idx: usize, chd_grad: &mut Vec<f32>, chd_shape: &Vec<usize>) {
+                    if idx == shape.len() { chd_grad[idx] = grad[idx]; return; }
+
+                    for i in 0..shape[idx] {
+                        let n_idx = idx * shape[idx] + i;
+                        let n_chd_idx = chd_idx * chd_shape[idx] + i % chd_shape[idx];
+                        fill_grad(n_idx, grad, shape, n_chd_idx, chd_grad, chd_shape);
+                    }
+                }
+
+                let self_grad = self.0.read().unwrap().grad.clone();
+                let self_shape = self.0.read().unwrap().shape.clone();
+                let mut chd_grad = self.0.read().unwrap().children[0].0.read().unwrap().grad.clone();
+                let chd_shape = self.0.read().unwrap().children[0].0.read().unwrap().shape.clone();
+                
+                fill_grad(0, &self_grad, &self_shape, 0, &mut chd_grad, &chd_shape);
+
+                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad;
+            }
+            else if op == "pow" {
+                let self_grad = self.0.read().unwrap().grad.clone();
+                let exp = self.0.read().unwrap().ctx.unwrap();
+                let chd_data = self.0.read().unwrap().children[0].0.read().unwrap().data.clone();
+                let mut chd_grad = self.0.read().unwrap().children[0].0.read().unwrap().grad.clone();
+                
+                for (i, (g, x)) in self_grad.iter().zip(chd_data.iter()).enumerate() {
+                    chd_grad[i] += exp * x.powf(exp - 1.0) * g;
+                }
+
+                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad;
+            }
+            else if op == "relu" {
+                let self_grad = self.0.read().unwrap().grad.clone();
+                let chd_data = self.0.read().unwrap().children[0].0.read().unwrap().data.clone();
+                let mut chd_grad = self.0.read().unwrap().children[0].0.read().unwrap().grad.clone();
+
+                for (i, (g, x)) in self_grad.iter().zip(chd_data.iter()).enumerate() {
+                    chd_grad[i] += if *x > 0.0 { *g } else { 0.0 };
+                }
+
+                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad;
+            }
+            else if op == "neg" {
+                let self_grad = self.0.read().unwrap().grad.clone();
+                let mut chd_grad = self.0.read().unwrap().children[0].0.read().unwrap().grad.clone();
+
+                for (i, g) in self_grad.iter().enumerate() {
+                    chd_grad[i] -= g;
+                }
+
+                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad;
+            }
+            else if op == "add" {
+                let self_grad = self.0.read().unwrap().grad.clone();
+                let mut chd_grad_1 = self.0.read().unwrap().children[0].0.read().unwrap().grad.clone();
+                let mut chd_grad_2 = self.0.read().unwrap().children[1].0.read().unwrap().grad.clone();
+                
+                for (i, g) in self_grad.iter().enumerate() {
+                    chd_grad_1[i] += g;
+                    chd_grad_2[i] += g;
+                }
+
+                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad_1;
+                self.0.write().unwrap().children[1].0.write().unwrap().grad = chd_grad_2;
+            }
+            else if op == "mul" {
+                let self_grad = self.0.read().unwrap().grad.clone();
+                let chd_data_1 = self.0.read().unwrap().children[0].0.read().unwrap().data.clone();
+                let chd_data_2 = self.0.read().unwrap().children[1].0.read().unwrap().data.clone();
+                let mut chd_grad_1 = self.0.read().unwrap().children[0].0.read().unwrap().grad.clone();
+                let mut chd_grad_2 = self.0.read().unwrap().children[1].0.read().unwrap().grad.clone();
+
+                for (i, g) in self_grad.iter().enumerate() {
+                    chd_grad_1[i] += chd_data_2[i] * g;
+                    chd_grad_2[i] += chd_data_1[i] * g;
+                }
+
+                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad_1;
+                self.0.write().unwrap().children[1].0.write().unwrap().grad = chd_grad_2;
+            }
+            // TODO: need rigorous analysis
+            else if op == "matmul" {
+                let self_grad = self.0.read().unwrap().grad.clone();
+                let chd_data_1 = self.0.read().unwrap().children[0].0.read().unwrap().data.clone();
+                let chd_data_2 = self.0.read().unwrap().children[1].0.read().unwrap().data.clone();
+                let chd_shape_1 = self.0.read().unwrap().children[0].0.read().unwrap().shape.clone();
+                let chd_shape_2 = self.0.read().unwrap().children[1].0.read().unwrap().shape.clone();
+                let mut chd_grad_1 = self.0.read().unwrap().children[0].0.read().unwrap().grad.clone();
+                let mut chd_grad_2 = self.0.read().unwrap().children[1].0.read().unwrap().grad.clone();
+
+                for i in 0..chd_shape_1[0] {
+                    for j in 0..chd_shape_2[1] {
+                        for k in 0..chd_shape_1[1] {
+                            chd_grad_1[i * chd_shape_1[1] + k] += chd_data_2[k * chd_shape_2[1] + j] * self_grad[i * chd_shape_2[1] + j];
+                            chd_grad_2[k * chd_shape_2[1] + j] += chd_data_1[i * chd_shape_1[1] + k] * self_grad[i * chd_shape_2[1] + j];
+                        }
+                    }
+                }
+
+                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad_1;
+                self.0.write().unwrap().children[1].0.write().unwrap().grad = chd_grad_2;
+            }
             else { panic!("Unknown op: {}", op); }
         }
     }
@@ -76,12 +175,19 @@ impl Tensor {
     }
 
     fn uniform_(shape: Vec<usize>, low: f32, high: f32, seed: Option<u64>) -> Tensor {
-        unimplemented!()
+        let mut rng = match seed {
+            Some(seed) => StdRng::seed_from_u64(seed),
+            None => StdRng::from_entropy(),
+        };
+        let data = (0..shape.iter().product::<usize>()).map(|_| rng.gen_range(low..high)).collect();
+        Tensor::new(data, shape, None)
     }
 
     // https://pytorch.org/docs/stable/_modules/torch/nn/init.html#kaiming_uniform_
+    // TODO: need rigorous analysis
     fn kaiming_uniform_(shape: Vec<usize>, a: f32, seed: Option<u64>) -> Tensor {
-        unimplemented!()
+        let bound = (3.0_f32).sqrt() * (2.0 / (1.0 + a.powf(2.0))) / (shape[1] as f32).sqrt();
+        Tensor::uniform_(shape, -bound, bound, seed)
     }
 
     // https://numpy.org/doc/stable/user/basics.broadcasting.html
@@ -141,6 +247,7 @@ impl Tensor {
     fn pow_(&self, exp: f32) -> Tensor {
         let data: Vec<f32> = self.0.read().unwrap().data.iter().map(|x| x.powf(exp)).collect();
         let out = Tensor::new(data, self.0.read().unwrap().shape.clone(), Some("pow".to_string()));
+        out.0.write().unwrap().ctx = Some(exp);
         {
             out.0.write().unwrap().children.push(self.clone());
         }
@@ -314,6 +421,14 @@ impl Tensor {
     fn __repr__(&self) -> PyResult<String> { Ok(format!("Tensor(data={:?}, shape={:?})", self.0.read().unwrap().data, self.0.read().unwrap().shape)) }
 
     fn backward(&self) -> PyResult<()> { Ok(self.backward_()) }
+    #[staticmethod]
+    fn uniform(shape: Vec<usize>, low: f32, high: f32, seed: Option<u64>) -> PyResult<Tensor> {
+        Ok(Tensor::uniform_(shape, low, high, seed))
+    }
+    #[staticmethod] 
+    fn kaiming_uniform(shape: Vec<usize>, a: f32, seed: Option<u64>) -> PyResult<Tensor> {
+        Ok(Tensor::kaiming_uniform_(shape, a, seed))
+    }
 
     // unary ops
     fn pow(&self, exp: f32) -> PyResult<Tensor> { Ok(self.pow_(exp)) }
