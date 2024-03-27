@@ -13,9 +13,9 @@ impl TensorId {
 }
 
 #[derive(Clone)]
-struct Tensor_ {
+struct RawTensor {
     id: TensorId,
-    data: Vec<f32>,
+    data: Vec<f32>, // TODO: multiple tensors can share the same data
     grad: Vec<f32>,
     shape: Vec<usize>,
     op: Option<String>,
@@ -25,12 +25,12 @@ struct Tensor_ {
 
 #[pyclass]
 #[derive(Clone)]
-pub struct Tensor(Arc<RwLock<Tensor_>>);
+pub struct Tensor(Arc<RwLock<RawTensor>>);
 
 impl Tensor {
     fn new(data: Vec<f32>, shape: Vec<usize>, op: Option<String>) -> Self {
         let len = data.len();
-        Tensor(Arc::new(RwLock::new(Tensor_ {
+        Tensor(Arc::new(RwLock::new(RawTensor {
             id: TensorId::new(),
             data,
             grad: vec![0.0; len],
@@ -41,7 +41,7 @@ impl Tensor {
         })))
     }
 
-    fn modify_grad(&self) {
+    fn modify_grad_(&self) {
         if let Some(op) = &self.0.read().unwrap().op {
             if op == "broadcast" {
                 fn fill_grad(idx: usize, grad: &Vec<f32>, shape: &Vec<usize>, chd_idx: usize, chd_grad: &mut Vec<f32>, chd_shape: &Vec<usize>) {
@@ -166,7 +166,7 @@ impl Tensor {
 
         let init_grad: Vec<f32> = vec![1.0; self.0.read().unwrap().data.len()];
         self.0.write().unwrap().grad = init_grad;
-        for v in topo.iter().rev() { v.modify_grad(); }
+        for v in topo.iter().rev() { v.modify_grad_(); }
     }
 
     fn uniform_(shape: Vec<usize>, low: f32, high: f32, seed: Option<u64>) -> Tensor {
@@ -317,8 +317,9 @@ const BLOCK_Y: usize = 16;
 const BLOCK_X: usize = 16;
 
 impl Tensor {
-    // slowwww matmul, numpy is 5.9x faster
+    // slowwww matmul, numpy is 5.6x faster
     // TODO: support nD tensors
+    // https://pytorch.org/docs/stable/generated/torch.matmul.html
     fn matmul_(&self, other: Tensor) -> Tensor {
         let self_read = self.0.read().unwrap();
         let other_read = other.0.read().unwrap();
