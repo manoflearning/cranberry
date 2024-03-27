@@ -9,15 +9,13 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.20.0", features = ["extension-module"], default-features = false }
-ndarray = "0.15.6"
 numpy = "0.20.0"
 rand = "0.8.4"
 
 [profile.dev]
 opt-level = 3
 lto = "fat"
+jemalloc = true
 codegen-units = 1
-debug = false
-strip = true
+codegen-units-std = 1
 panic = "abort"
-linker-plugin-lto = true
