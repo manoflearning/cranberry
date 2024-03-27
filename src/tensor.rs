@@ -1,8 +1,3 @@
-// - broadcasting
-// - various ops
-// - correct backprop
-// - do not use ndarray
-
 use pyo3::prelude::*;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{collections::HashSet, ops::{Add, Div, Mul, Neg, Sub}, sync::{Arc, RwLock}};
