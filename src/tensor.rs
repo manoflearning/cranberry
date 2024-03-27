@@ -41,6 +41,15 @@ impl Tensor {
         })))
     }
 
+    // https://pytorch.org/docs/stable/generated/torch.equal.html
+    fn equal_(a: &Tensor, b: &Tensor) -> bool {
+        let a_read = a.0.read().unwrap();
+        let b_read = b.0.read().unwrap();
+        if a_read.data != b_read.data { return false; }
+        if a_read.shape != b_read.shape { return false; }
+        true
+    }
+
     fn modify_grad_(&self) {
         if let Some(op) = &self.0.read().unwrap().op {
             if op == "broadcast" {
@@ -187,7 +196,7 @@ impl Tensor {
 
     // https://numpy.org/doc/stable/user/basics.broadcasting.html
     // TODO: currently naive, slow, and memory inefficient implementation
-    fn broadcast_(&self, other: Tensor) -> (Tensor, Tensor) {
+    fn broadcast_(&self, other: &Tensor) -> (Tensor, Tensor) {
         let mut self_shape = self.0.read().unwrap().shape.clone();
         let mut other_shape = other.0.read().unwrap().shape.clone();
         
@@ -276,7 +285,7 @@ impl Neg for Tensor {
 impl Add<Tensor> for Tensor {
     type Output = Tensor;
     fn add(self, other: Tensor) -> Self::Output {
-        let (self_br, other_br) = self.broadcast_(other);
+        let (self_br, other_br) = self.broadcast_(&other);
         let data: Vec<f32> = self_br.0.read().unwrap().data.iter().zip(other_br.0.read().unwrap().data.iter()).map(|(x, y)| x + y).collect();
         let out = Tensor::new(data, self_br.0.read().unwrap().shape.clone(), Some("add".to_string()));
         {
@@ -295,7 +304,7 @@ impl Sub<Tensor> for Tensor {
 impl Mul<Tensor> for Tensor {
     type Output = Tensor;
     fn mul(self, other: Tensor) -> Self::Output {
-        let (self_br, other_br) = self.broadcast_(other);
+        let (self_br, other_br) = self.broadcast_(&other);
         let data: Vec<f32> = self_br.0.read().unwrap().data.iter().zip(other_br.0.read().unwrap().data.iter()).map(|(x, y)| x * y).collect();
         let out = Tensor::new(data, self_br.0.read().unwrap().shape.clone(), Some("mul".to_string()));
         {
@@ -318,9 +327,9 @@ const BLOCK_X: usize = 16;
 
 impl Tensor {
     // slowwww matmul, numpy is 5.6x faster
-    // TODO: support nD tensors
+    // TODO: support nD tensors, arbitrary matrix sizes
     // https://pytorch.org/docs/stable/generated/torch.matmul.html
-    fn matmul_(&self, other: Tensor) -> Tensor {
+    fn matmul_(&self, other: &Tensor) -> Tensor {
         let self_read = self.0.read().unwrap();
         let other_read = other.0.read().unwrap();
 
@@ -352,9 +361,8 @@ impl Tensor {
 
                 for iy in 0..BLOCK_Y {
                     for ix in 0..BLOCK_X {
-                        let acc_vec = acc[iy * BLOCK_X + ix].to_array();
                         let st = (y + iy) * dim_2 + x + ix * BLOCK;
-                        out_data.splice(st..st + BLOCK, acc_vec);
+                        out_data.splice(st..st + BLOCK, acc[iy * BLOCK_X + ix].to_array());
                     }
                 }
 
@@ -374,7 +382,7 @@ impl Tensor {
 
 impl Tensor {
     fn linear_(&self, weight: Tensor, bias: Option<Tensor>) -> Tensor {
-        let mut out =  self.matmul_(weight);
+        let mut out =  self.matmul_(&weight);
         if let Some(bias) = bias { out = out + bias; }
         out
     }
@@ -416,15 +424,14 @@ impl Tensor {
     // TODO: we need better __repr__
     fn __repr__(&self) -> PyResult<String> { Ok(format!("Tensor(data={:?}, shape={:?})", self.0.read().unwrap().data, self.0.read().unwrap().shape)) }
 
+    fn __eq__(&self, other: &Tensor) -> PyResult<bool> { Ok(Tensor::equal_(self, &other)) }
+
     fn backward(&self) -> PyResult<()> { Ok(self.backward_()) }
+
     #[staticmethod]
-    fn uniform(shape: Vec<usize>, low: f32, high: f32, seed: Option<u64>) -> PyResult<Tensor> {
-        Ok(Tensor::uniform_(shape, low, high, seed))
-    }
+    fn uniform(shape: Vec<usize>, low: f32, high: f32, seed: Option<u64>) -> PyResult<Tensor> { Ok(Tensor::uniform_(shape, low, high, seed)) }
     #[staticmethod] 
-    fn kaiming_uniform(shape: Vec<usize>, a: f32, seed: Option<u64>) -> PyResult<Tensor> {
-        Ok(Tensor::kaiming_uniform_(shape, a, seed))
-    }
+    fn kaiming_uniform(shape: Vec<usize>, a: f32, seed: Option<u64>) -> PyResult<Tensor> { Ok(Tensor::kaiming_uniform_(shape, a, seed)) }
 
     // unary ops
     fn pow(&self, exp: f32) -> PyResult<Tensor> { Ok(self.pow_(exp)) }
@@ -432,13 +439,13 @@ impl Tensor {
     fn __neg__(&self) -> PyResult<Tensor> { Ok(-self.clone()) }
 
     // binary ops
-    fn __add__(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.clone() + other.clone()) }
-    fn __sub__(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.clone() - other.clone()) }
-    fn __mul__(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.clone() * other.clone()) }
-    fn __truediv__(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.clone() / other.clone()) }
-    fn __matmul__(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.matmul_(other)) }
-    fn matmul(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.matmul_(other)) }
-    fn dot(&self, other: Tensor) -> PyResult<Tensor> { Ok(self.matmul_(other)) }
+    fn __add__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() + other.clone()) }
+    fn __sub__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() - other.clone()) }
+    fn __mul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() * other.clone()) }
+    fn __truediv__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() / other.clone()) }
+    fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.matmul_(&other)) }
+    fn matmul(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.matmul_(&other)) }
+    fn dot(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.matmul_(&other)) }
     
     // functional nn ops
     fn linear(&self, weight: Tensor, bias: Option<Tensor>) -> PyResult<Tensor> { Ok(self.linear_(weight, bias)) }
