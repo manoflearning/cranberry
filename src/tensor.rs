@@ -422,7 +422,20 @@ impl Tensor {
     }
 
     // TODO: we need better __repr__
-    fn __repr__(&self) -> PyResult<String> { Ok(format!("Tensor(data={:?}, shape={:?})", self.0.read().unwrap().data, self.0.read().unwrap().shape)) }
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("Tensor(data={:?}, shape={:?})", self.0.read().unwrap().data, self.0.read().unwrap().shape))
+    }
+
+    fn numpy(&self) {
+        unimplemented!()
+    }
+
+    #[getter]
+    fn data(&self) -> PyResult<Vec<f32>> { Ok(self.0.read().unwrap().data.clone()) }
+    #[getter]
+    fn grad(&self) -> PyResult<Vec<f32>> { Ok(self.0.read().unwrap().grad.clone()) }
+    #[getter]
+    fn shape(&self) -> PyResult<Vec<usize>> { Ok(self.0.read().unwrap().shape.clone()) }
 
     fn __eq__(&self, other: &Tensor) -> PyResult<bool> { Ok(self == other) }
 
