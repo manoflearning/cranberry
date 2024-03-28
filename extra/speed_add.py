@@ -1,3 +1,6 @@
+import os
+os.environ['OMP_NUM_THREADS'] = '1'
+
 import cranberry as cb
 import numpy as np
 import time
