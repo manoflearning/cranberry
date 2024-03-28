@@ -20,7 +20,7 @@ class TestCranberry(unittest.TestCase):
         a += b
         val2 = np.array(a.data)
 
-        np.testing.assert_allclose(val1, val2)        
+        np.testing.assert_allclose(val1, val2)
 
 if __name__ == '__main__':
     unittest.main()

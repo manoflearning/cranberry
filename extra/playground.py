@@ -1,14 +1,13 @@
-import cranberry as cr
+import cranberry as cb
 import numpy as np
 
-a = cr.Tensor(np.array([1, 2, 3], dtype=np.float32))
-b = cr.Tensor(np.array([3, 2, 1], dtype=np.float32))
+list = [[1, 1, 1]]
 
-c = a + b
-d = c * a
-e = d / a
+a = cb.Tensor(np.array(list))
+b = cb.Tensor([3, 2, 2])
 
-print(d)
-print(e)
+c = a * b
 
-d.backward()
+print(c)
+print(c.shape)
+print(c.grad)

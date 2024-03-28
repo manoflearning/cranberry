@@ -341,7 +341,7 @@ impl Tensor {
 
         let self_data = self_read.data.clone();
         let other_data = other_read.data.clone();
-        let mut out_data: Vec<f32> = vec![0.0; dim_0 * dim_2];
+        let mut out_data = vec![0.0; dim_0 * dim_2];
 
         // https://github.com/tinygrad/tinygrad/blob/master/extra/gemm/gemm.c
         for y in (0..dim_0).step_by(BLOCK_Y) {
@@ -426,9 +426,7 @@ impl Tensor {
         Ok(format!("Tensor(data={:?}, shape={:?})", self.0.read().unwrap().data, self.0.read().unwrap().shape))
     }
 
-    fn numpy(&self) {
-        unimplemented!()
-    }
+    fn numpy(&self) { unimplemented!() }
 
     #[getter]
     fn data(&self) -> PyResult<Vec<f32>> { Ok(self.0.read().unwrap().data.clone()) }
