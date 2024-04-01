@@ -8,15 +8,13 @@ pub struct Data {
 
 impl Deref for Data {
     type Target = [f32];
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
+    #[inline]
+    fn deref(&self) -> &Self::Target { &self.data }
 }
 
 impl PartialEq for Data {
-    fn eq(&self, other: &Self) -> bool {
-        self.data == other.data
-    }
+    #[inline]
+    fn eq(&self, other: &Self) -> bool { self.data == other.data }
 }
 
 impl FromIterator<f32> for Data {
@@ -29,24 +27,20 @@ impl FromIterator<f32> for Data {
 
 impl Index<usize> for Data {
     type Output = f32;
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.data[index]
-    }
+    #[inline]
+    fn index(&self, index: usize) -> &Self::Output { &self.data[index] }
 }
 impl IndexMut<usize> for Data {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.data[index]
-    }
+    #[inline]
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output { &mut self.data[index] }
 }
 impl Index<RangeFrom<usize>> for Data {
     type Output = [f32];
-    fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
-        &self.data[index]
-    }
+    #[inline]
+    fn index(&self, index: RangeFrom<usize>) -> &Self::Output { &self.data[index] }
 }
 impl Index<Range<usize>> for Data {
     type Output = [f32];
-    fn index(&self, index: Range<usize>) -> &Self::Output {
-        &self.data[index]
-    }
+    #[inline]
+    fn index(&self, index: Range<usize>) -> &Self::Output { &self.data[index] }
 }
