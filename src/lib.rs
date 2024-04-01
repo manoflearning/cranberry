@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 
 mod tensor;
 use tensor::Tensor;
+mod data;
 
 #[pymodule]
 fn cranberry(_py: Python, m: &PyModule) -> PyResult<()> {

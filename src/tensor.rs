@@ -1,3 +1,4 @@
+use crate::data::Data;
 use pyo3::prelude::*;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{collections::HashSet, ops::{Add, Div, Mul, Neg, Sub}, sync::{Arc, RwLock}};
@@ -15,7 +16,7 @@ impl TensorId {
 #[derive(Clone)]
 struct RawTensor {
     id: TensorId,
-    data: Vec<f32>, // TODO: multiple tensors can share the same data
+    data: Data,
     grad: Vec<f32>,
     shape: Vec<usize>,
     op: Option<String>,
@@ -28,7 +29,7 @@ struct RawTensor {
 pub struct Tensor(Arc<RwLock<RawTensor>>);
 
 impl Tensor {
-    fn new(data: Vec<f32>, shape: Vec<usize>, op: Option<String>) -> Self {
+    fn new(data: Data, shape: Vec<usize>, op: Option<String>) -> Self {
         let len = data.len();
         Tensor(Arc::new(RwLock::new(RawTensor {
             id: TensorId::new(),
@@ -210,10 +211,10 @@ impl Tensor {
             return (self.clone(), other.clone());
         }
 
-        let mut self_data_br: Vec<f32> = vec![0.0; out_shape.iter().product::<usize>() as usize];
-        let mut other_data_br: Vec<f32> = vec![0.0; out_shape.iter().product::<usize>() as usize];
+        let mut self_data_br: Data = Data { data: vec![0.0; out_shape.iter().product::<usize>() as usize] };
+        let mut other_data_br: Data = Data { data: vec![0.0; out_shape.iter().product::<usize>() as usize] };
 
-        fn fill_data(idx: usize, data: &Vec<f32>, shape: &Vec<usize>, out_idx: usize, out_data: &mut Vec<f32>, out_shape: &Vec<usize>) {
+        fn fill_data(idx: usize, data: &Data, shape: &Vec<usize>, out_idx: usize, out_data: &mut Data, out_shape: &Vec<usize>) {
             if idx == shape.len() { out_data[out_idx] = data[idx]; return; }
 
             for i in 0..out_shape[idx] {
@@ -249,7 +250,7 @@ impl PartialEq for Tensor {
 
 impl Tensor {
     fn pow_(&self, exp: f32) -> Tensor {
-        let data: Vec<f32> = self.0.read().unwrap().data.iter().map(|x| x.powf(exp)).collect();
+        let data: Data = Data { data: self.0.read().unwrap().data.iter().map(|x| x.powf(exp)).collect() };
         let out = Tensor::new(data, self.0.read().unwrap().shape.clone(), Some("pow".to_string()));
         out.0.write().unwrap().ctx = Some(exp);
         {
@@ -259,7 +260,7 @@ impl Tensor {
     }
 
     fn relu_(&self) -> Tensor {
-        let data: Vec<f32> = self.0.read().unwrap().data.iter().map(|x| x.max(0.0)).collect();
+        let data: Data = Data { data: self.0.read().unwrap().data.iter().map(|x| x.max(0.0)).collect() };
         let out = Tensor::new(data, self.0.read().unwrap().shape.clone(), Some("relu".to_string()));
         {
             out.0.write().unwrap().children.push(self.clone());
@@ -271,7 +272,7 @@ impl Tensor {
 impl Neg for Tensor {
     type Output = Tensor;
     fn neg(self) -> Self::Output {
-        let data: Vec<f32> = self.0.read().unwrap().data.iter().map(|x| -x).collect();
+        let data: Data = Data { data: self.0.read().unwrap().data.iter().map(|x| -x).collect() };
         let out = Tensor::new(data, self.0.read().unwrap().shape.clone(), Some("neg".to_string()));
         {
             out.0.write().unwrap().children.push(self.clone());
@@ -286,7 +287,7 @@ impl Add<Tensor> for Tensor {
     type Output = Tensor;
     fn add(self, other: Tensor) -> Self::Output {
         let (self_br, other_br) = self.broadcast_(&other);
-        let data: Vec<f32> = self_br.0.read().unwrap().data.iter().zip(other_br.0.read().unwrap().data.iter()).map(|(x, y)| x + y).collect();
+        let data: Data = Data { data: self_br.0.read().unwrap().data.iter().zip(other_br.0.read().unwrap().data.iter()).map(|(x, y)| x + y).collect() };
         let out = Tensor::new(data, self_br.0.read().unwrap().shape.clone(), Some("add".to_string()));
         {
             out.0.write().unwrap().children.push(self_br);
@@ -305,7 +306,7 @@ impl Mul<Tensor> for Tensor {
     type Output = Tensor;
     fn mul(self, other: Tensor) -> Self::Output {
         let (self_br, other_br) = self.broadcast_(&other);
-        let data: Vec<f32> = self_br.0.read().unwrap().data.iter().zip(other_br.0.read().unwrap().data.iter()).map(|(x, y)| x * y).collect();
+        let data: Data = Data { data: self_br.0.read().unwrap().data.iter().zip(other_br.0.read().unwrap().data.iter()).map(|(x, y)| x * y).collect() };
         let out = Tensor::new(data, self_br.0.read().unwrap().shape.clone(), Some("mul".to_string()));
         {
             out.0.write().unwrap().children.push(self_br);
@@ -322,12 +323,10 @@ impl Div<Tensor> for Tensor {
 
 use std::simd::f32x64;
 const BLOCK: usize = 64;
-const BLOCK_Y: usize = 16;
-const BLOCK_X: usize = 16;
 
 impl Tensor {
-    // slowwww matmul, numpy is 5.6x faster
-    // TODO: support nD tensors, arbitrary matrix sizes
+    // slowww matmul, numpy is 5x faster
+    // TODO: support nD tensors
     // https://pytorch.org/docs/stable/generated/torch.matmul.html
     fn matmul_(&self, other: &Tensor) -> Tensor {
         let self_read = self.0.read().unwrap();
@@ -341,30 +340,45 @@ impl Tensor {
 
         let self_data = self_read.data.clone();
         let other_data = other_read.data.clone();
-        let mut out_data = vec![0.0; dim_0 * dim_2];
 
-        // https://github.com/tinygrad/tinygrad/blob/master/extra/gemm/gemm.c
-        for y in (0..dim_0).step_by(BLOCK_Y) {
-            for x in (0..dim_2).step_by(BLOCK_X * BLOCK) {
-            
-                let mut acc = vec![f32x64::splat(0.0); BLOCK_Y * BLOCK_X];
+        let mut out_data = Data { data: vec![0.0; dim_0 * dim_2] };
 
+        // for y in (0..dim_0).step_by(BLOCK_Y) {
+        //     for x in (0..dim_2).step_by(BLOCK * BLOCK_X) {
+
+        //         let mut acc = vec![f32x64::splat(0.0); BLOCK_Y * BLOCK_X];
+        //         for k in 0..dim_1 {
+        //             for iy in 0..BLOCK_Y {
+        //                 let ta = f32x64::splat(self_data[(y+iy)*dim_1+k]);
+        //                 for ix in 0..BLOCK_X {
+        //                     let st = k * dim_2 + x + ix * BLOCK;
+        //                     let tb = f32x64::from_slice(&other_data[st..st+BLOCK]);
+        //                     acc[iy * BLOCK_X + ix] += ta * tb;
+        //                 }
+        //             }
+        //         }
+
+        //         for iy in 0..BLOCK_Y {
+        //             for ix in 0..BLOCK_X {
+        //                 let st = (y + iy) * dim_2 + x + ix * BLOCK;
+        //                 out_data.data.splice(st..st + BLOCK, acc[iy * BLOCK_X + ix].to_array());
+        //             }
+        //         }
+        //     }
+        // }
+
+        for i in 0..dim_0 {
+            for j in (0..dim_2).step_by(BLOCK) {
+
+                let mut acc = f32x64::splat(0.0);
                 for k in 0..dim_1 {
-                    for iy in 0..BLOCK_Y {
-                        let ta = f32x64::splat(self_data[(y + iy) * dim_1 + k]);
-                        for ix in 0..BLOCK_X {
-                            let tb = f32x64::from_slice(&other_data[k * dim_2 + x + ix * BLOCK..k * dim_2 + x + (ix + 1) * BLOCK]);
-                            acc[iy * BLOCK_X + ix] += ta * tb;
-                        }
-                    }
+                    let ta = f32x64::splat(self_data[i * dim_1 + k]);
+                    let tb = f32x64::from_slice(&other_data[k*dim_2+j .. k*dim_2+j+BLOCK]);
+
+                    acc += ta * tb;
                 }
 
-                for iy in 0..BLOCK_Y {
-                    for ix in 0..BLOCK_X {
-                        let st = (y + iy) * dim_2 + x + ix * BLOCK;
-                        out_data.splice(st..st + BLOCK, acc[iy * BLOCK_X + ix].to_array());
-                    }
-                }
+                out_data.data.splice(i*dim_2+j .. i*dim_2+j+BLOCK, acc.to_array());
 
             }
         }
@@ -418,18 +432,18 @@ impl Tensor {
     #[new]
     fn __init__(data: List<f32>) -> PyResult<Self> {
         let (data, shape) = process_list(data);
-        Ok(Self::new(data, shape, None))
+        Ok(Self::new(Data { data }, shape, None))
     }
 
     // TODO: we need better __repr__
     fn __repr__(&self) -> PyResult<String> {
-        Ok(format!("Tensor(data={:?}, shape={:?})", self.0.read().unwrap().data, self.0.read().unwrap().shape))
+        Ok(format!("Tensor(data={:?}, shape={:?})", self.0.read().unwrap().data.data, self.0.read().unwrap().shape))
     }
 
     fn numpy(&self) { unimplemented!() }
 
     #[getter]
-    fn data(&self) -> PyResult<Vec<f32>> { Ok(self.0.read().unwrap().data.clone()) }
+    fn data(&self) -> PyResult<Vec<f32>> { Ok(self.0.read().unwrap().data.data.clone()) }
     #[getter]
     fn grad(&self) -> PyResult<Vec<f32>> { Ok(self.0.read().unwrap().grad.clone()) }
     #[getter]
