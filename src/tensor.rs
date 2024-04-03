@@ -326,17 +326,71 @@ const BLOCK: usize = 64;
 
 impl Tensor {
     // slowww matmul, numpy is 5x faster
-    // TODO: support nD tensors
-    // https://pytorch.org/docs/stable/generated/torch.matmul.html
-    fn matmul_(&self, other: &Tensor) -> Tensor {
+    fn matmul_(self, other: & Tensor) -> Tensor {
+        let self_shape = self.0.read().unwrap().shape.clone();
+        let other_shape = other.0.read().unwrap().shape.clone();
+        // reference: https://pytorch.org/docs/stable/generated/torch.matmul.html
+        // If both tensors are 1-dimensional, the dot product (scalar) is returned.
+        if self_shape.len() == 1 && other_shape.len() == 1 {
+            assert!(self_shape[0] == other_shape[0], "Tensor dimensions must match");
+            self.0.write().unwrap().shape = vec![1, self_shape[0]];
+            other.0.write().unwrap().shape = vec![other_shape[0], 1];
+
+            let out = self.matmul_2d_(other);
+            self.0.write().unwrap().shape = vec![self_shape[0]];
+            other.0.write().unwrap().shape = vec![other_shape[0]];
+            out.0.write().unwrap().shape = vec![];
+            return out
+        }
+        // If both arguments are 2-dimensional, the matrix-matrix product is returned.
+        else if self_shape.len() == 2 && other_shape.len() == 2 {
+            assert!(self_shape[1] == other_shape[0], "Tensor dimensions must match");
+            return self.matmul_2d_(other)
+        }
+        // If the first argument is 1-dimensional and the second argument is 2-dimensional, 
+        // a 1 is prepended to its dimension for the purpose of the matrix multiply. After the matrix multiply, the prepended dimension is removed.
+        else if self_shape.len() == 1 && other_shape.len() == 2 {
+            assert!(self_shape[0] == other_shape[0], "Tensor dimensions must match");
+            self.0.write().unwrap().shape = vec![1, self_shape[0]];
+
+            let out = self.matmul_2d_(other);
+            self.0.write().unwrap().shape = vec![self_shape[0]];
+            out.0.write().unwrap().shape = vec![other_shape[1]];
+            return out
+        }
+        // If the first argument is 2-dimensional and the second argument is 1-dimensional, the matrix-vector product is returned.
+        else if self_shape.len() == 2 && other_shape.len() == 1 {
+            assert!(self_shape[1] == other_shape[0], "Tensor dimensions must match");
+            other.0.write().unwrap().shape = vec![other_shape[0], 1];
+
+            let out = self.matmul_2d_(other);
+            other.0.write().unwrap().shape = vec![other_shape[0]];
+            out.0.write().unwrap().shape = vec![self_shape[0]];
+            out
+        }
+        // If both arguments are at least 1-dimensional and at least one argument is N-dimensional (where N > 2), then a batched matrix multiply is returned.
+        // If the first argument is 1-dimensional, a 1 is prepended to its dimension for the purpose of the batched matrix multiply and removed after.
+        // If the second argument is 1-dimensional, a 1 is appended to its dimension for the purpose of the batched matrix multiple and removed after.
+        // The non-matrix (i.e. batch) dimensions are broadcasted (and thus must be broadcastable).
+        else if self_shape.len() >= 1 && other_shape.len() >= 1 && (self_shape.len() > 2 || other_shape.len() > 2){
+            let (self_br, other_br) = self.broadcast_(other);
+            let self_br_shape = self_br.0.read().unwrap().shape.clone();
+            let other_br_shape = other_br.0.read().unwrap().shape.clone();
+
+            let n = self_br_shape.len();
+            assert!(self_br_shape[n - 1] == other_br_shape[n - 2], "Tensor dimensions must match");
+
+            unimplemented!()
+        }
+        else { panic!("Tensor dimensions must match"); }
+    }
+    fn matmul_2d_(&self, other: &Tensor) -> Tensor {
         let self_read = self.0.read().unwrap();
         let other_read = other.0.read().unwrap();
-
+        
         let dim_0 = self_read.shape[0];
         let dim_1 = self_read.shape[1];
         let dim_2 = other_read.shape[1];
-
-        assert_eq!(self_read.shape[1], other_read.shape[0], "Tensor dimensions must match");
 
         let self_data = self_read.data.clone();
         let other_data = other_read.data.clone();
@@ -370,16 +424,23 @@ impl Tensor {
         for i in 0..dim_0 {
             for j in (0..dim_2).step_by(BLOCK) {
 
-                let mut acc = f32x64::splat(0.0);
-                for k in 0..dim_1 {
-                    let ta = f32x64::splat(self_data[i * dim_1 + k]);
-                    let tb = f32x64::from_slice(&other_data[k*dim_2+j .. k*dim_2+j+BLOCK]);
+                if j+BLOCK < dim_2 {
+                    let mut acc = f32x64::splat(0.0);
+                    for k in 0..dim_1 {
+                        let ta = f32x64::splat(self_data[i * dim_1 + k]);
+                        let tb = f32x64::from_slice(&other_data[k*dim_2+j .. k*dim_2+j+BLOCK]);
 
-                    acc += ta * tb;
+                        acc += ta * tb;
+                    }
+                    out_data.data.splice(i*dim_2+j..i*dim_2+j+BLOCK, acc.to_array());
                 }
-
-                out_data.data.splice(i*dim_2+j .. i*dim_2+j+BLOCK, acc.to_array());
-
+                else { // TODO: need a faster way to handle the edge case
+                    for k in 0..dim_1 {
+                        for l in j..dim_2 {
+                            out_data[i*dim_2+l] += self_data[i*dim_1+k] * other_data[k*dim_2+l];
+                        }
+                    }
+                }
             }
         }
 
@@ -396,7 +457,7 @@ impl Tensor {
 
 impl Tensor {
     fn linear_(&self, weight: Tensor, bias: Option<Tensor>) -> Tensor {
-        let mut out =  self.matmul_(&weight);
+        let mut out =  self.clone().matmul_(&weight);
         if let Some(bias) = bias { out = out + bias; }
         out
     }
@@ -468,9 +529,9 @@ impl Tensor {
     fn __sub__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() - other.clone()) }
     fn __mul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() * other.clone()) }
     fn __truediv__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() / other.clone()) }
-    fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.matmul_(&other)) }
-    fn matmul(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.matmul_(&other)) }
-    fn dot(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.matmul_(&other)) }
+    fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
+    fn matmul(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
+    fn dot(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
     
     // functional nn ops
     fn linear(&self, weight: Tensor, bias: Option<Tensor>) -> PyResult<Tensor> { Ok(self.linear_(weight, bias)) }
