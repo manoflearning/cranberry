@@ -13,7 +13,7 @@ numpy = "0.20.0"
 rand = "0.8.4"
 thread-priority = "0.16.0"
 
-[profile.dev]
+[profile.release]
 opt-level = 3
 lto = "fat"
 jemalloc = true
