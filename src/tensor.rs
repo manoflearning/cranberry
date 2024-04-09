@@ -326,7 +326,6 @@ use std::simd::f32x64;
 const BLOCK: usize = 64;
 
 impl Tensor {
-    // slowww matmul, numpy is 5x faster
     fn matmul_(self, other: & Tensor) -> Tensor {
         let self_shape = self.0.read().unwrap().shape.clone();
         let other_shape = other.0.read().unwrap().shape.clone();
@@ -385,6 +384,7 @@ impl Tensor {
         }
         else { panic!("Tensor dimensions must match"); }
     }
+    // slowww matmul, numpy is 3-6x faster
     fn matmul_2d_(&self, other: &Tensor) -> Tensor {
         let self_read = self.0.read().unwrap();
         let other_read = other.0.read().unwrap();
