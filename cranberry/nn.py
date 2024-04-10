@@ -13,6 +13,9 @@ class Linear:
     def __str__(self):
         return f"Linear(in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, bias={self.bias is not None})"        
 
+    def parameters(self):
+        return [self.weight, self.bias] if self.bias is not None else [self.weight]
+
 class ReLU:
     def __call__(self, x: cb.Tensor) -> cb.Tensor:
         return x.relu()
