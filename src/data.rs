@@ -1,7 +1,7 @@
 use std::ops::{Deref, Index, IndexMut, Range, RangeFrom};
 
 #[repr(align(64))] // for SIMD and cache alignment
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Data {
     pub(crate) data: Vec<f32>,
 }
@@ -10,11 +10,6 @@ impl Deref for Data {
     type Target = [f32];
     #[inline]
     fn deref(&self) -> &Self::Target { &self.data }
-}
-
-impl PartialEq for Data {
-    #[inline]
-    fn eq(&self, other: &Self) -> bool { self.data == other.data }
 }
 
 impl FromIterator<f32> for Data {
