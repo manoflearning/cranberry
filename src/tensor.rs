@@ -57,14 +57,13 @@ impl Tensor {
     fn modify_grad_(&self) {
         if let Some(op) = &self.0.read().unwrap().op {
             if op == "broadcast" {
-                // TODO: fix bug in fill_grad
                 fn fill_grad(dep: usize, idx: usize, grad: &Vec<f32>, shape: &Vec<usize>, chd_idx: usize, chd_grad: &mut Vec<f32>, chd_shape: &Vec<usize>) {
-                    if dep == shape.len() { chd_grad[idx] = grad[idx]; return; }
+                    if dep == shape.len() { chd_grad[chd_idx] = grad[idx]; return; }
 
-                    for i in 0..shape[idx] {
-                        let n_idx = idx * shape[idx] + i;
-                        let n_chd_idx = chd_idx * chd_shape[idx] + i % chd_shape[idx];
-                        fill_grad(0, n_idx, grad, shape, n_chd_idx, chd_grad, chd_shape);
+                    for i in 0..shape[dep] {
+                        let n_idx = idx * shape[dep] + i;
+                        let n_chd_idx = chd_idx * chd_shape[dep] + i % chd_shape[dep];
+                        fill_grad(dep + 1, n_idx, grad, shape, n_chd_idx, chd_grad, chd_shape);
                     }
                 }
 
@@ -138,7 +137,6 @@ impl Tensor {
                 self.0.read().unwrap().children[0].0.write().unwrap().grad = chd_grad_1;
                 self.0.read().unwrap().children[1].0.write().unwrap().grad = chd_grad_2;
             }
-            // TODO: need rigorous analysis
             else if op == "matmul" {
                 let self_grad = self.0.read().unwrap().grad.clone();
                 let chd_data_1 = self.0.read().unwrap().children[0].0.read().unwrap().data.clone();
@@ -161,12 +159,10 @@ impl Tensor {
                 self.0.read().unwrap().children[1].0.write().unwrap().grad = chd_grad_2;
             }
             else if op == "sum" {
-                let self_grad = self.0.read().unwrap().grad.clone();
+                let self_grad = self.0.read().unwrap().grad[0];
                 let mut chd_grad = self.0.read().unwrap().children[0].0.read().unwrap().grad.clone();
 
-                for (i, g) in self_grad.iter().enumerate() {
-                    chd_grad[i] += g;
-                }
+                chd_grad.iter_mut().for_each(|x| *x += self_grad);
 
                 self.0.read().unwrap().children[0].0.write().unwrap().grad = chd_grad;
             }
@@ -180,7 +176,7 @@ impl Tensor {
         fn build_topo(v: Tensor, topo: &mut Vec<Tensor>, visited: &mut HashSet<TensorId>) {
             visited.insert(v.0.read().unwrap().id);
             for child in &v.0.read().unwrap().children {
-                if !visited.contains(&child.0.read().unwrap().id) {
+                if child.0.read().unwrap().requires_grad && !visited.contains(&child.0.read().unwrap().id) {
                     build_topo(child.clone(), topo, visited);
                 }
             }
