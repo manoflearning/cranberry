@@ -459,6 +459,23 @@ impl Tensor {
     }
 }
 
+// ******************** reduce ops ************************
+
+impl Tensor {
+    // https://pytorch.org/docs/stable/generated/torch.sum.html
+    fn sum_(&self) -> Tensor {
+        let data: Data = Data { data: vec![self.0.read().unwrap().data.iter().sum()] };
+        let out = Tensor::new(data, vec![], Some("sum".to_string()));
+        out.0.write().unwrap().children.push(self.clone());
+        out
+    }
+    // https://pytorch.org/docs/stable/generated/torch.mean.html
+    fn mean_(&self) -> Tensor {
+        let out = self.sum_() / Tensor::new(Data { data: vec![self.0.read().unwrap().data.len() as f32] }, vec![], None);
+        out
+    }
+}
+
 // ******************** functional nn ops *****************
 
 impl Tensor {
@@ -577,6 +594,10 @@ impl Tensor {
     fn matmul(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
     fn dot(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
     
+    // reduce ops
+    fn sum(&self) -> PyResult<Tensor> { Ok(self.sum_()) }
+    fn mean(&self) -> PyResult<Tensor> { Ok(self.mean_()) }
+
     // functional nn ops
     fn linear(&self, weight: Tensor, bias: Option<Tensor>) -> PyResult<Tensor> { Ok(self.linear_(weight, bias)) }
 }
