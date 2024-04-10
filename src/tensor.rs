@@ -1,4 +1,5 @@
 use crate::data::Data;
+use numpy::{PyArray, PyArrayDyn};
 use pyo3::prelude::*;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{collections::HashSet, ops::{Add, Div, Mul, Neg, Sub}, sync::{Arc, RwLock}};
@@ -464,7 +465,6 @@ impl Tensor {
         let n = self.0.read().unwrap().shape.len();
         assert_eq!(self.0.read().unwrap().shape[n-1], weight.0.read().unwrap().shape[0], "Tensor dimensions must match");
         let mut out =  self.clone().matmul_(&weight);
-        // TODO: bias broadcasting
         if let Some(bias) = bias { out = out + bias; }
         out
     }
@@ -498,12 +498,12 @@ fn process_list(list: List<f32>) -> (Vec<f32>, Vec<usize>) {
 // TODO: need high readable print_data
 fn print_data(tensor: &Tensor) -> String {
     fn formulate_string(data: &Data, shape: &Vec<usize>, idx: usize, dep: usize) -> String {
-        if dep == shape.len() { return format!(" {:.4}", data[idx]); }
+        if dep == shape.len() { return format!("{:.4}", data[idx]); }
         let mut out = String::from("[");
         for i in 0..shape[dep] {
             out.push_str(&formulate_string(data, shape, idx * shape[dep] + i, dep + 1));
             if i < shape[dep] - 1 {
-                out.push_str(",");
+                out.push_str(", ");
                 // if shape.len() == dep + 2 { out.push_str("\n"); }
             }
         }
@@ -525,7 +525,16 @@ impl Tensor {
         Ok(format!("tensor({}, requires_grad={:?})", print_data(self), self.0.read().unwrap().requires_grad))
     }
 
-    fn numpy(&self) { unimplemented!() }
+    fn numpy(&self) -> PyResult<Py<PyArrayDyn<f32>>> {
+        let data = self.0.read().unwrap();
+        let shape = data.shape.clone();
+        let data = data.data.data.clone();
+
+        Python::with_gil(|py| {
+            let array = PyArray::from_vec(py, data).reshape(shape)?.to_dyn();
+            Ok(array.to_owned())
+        })
+    }
 
     #[getter]
     fn data(&self) -> PyResult<Vec<f32>> { Ok(self.0.read().unwrap().data.data.clone()) }
