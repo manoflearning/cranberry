@@ -31,18 +31,27 @@ struct RawTensor {
 pub struct Tensor(Arc<RwLock<RawTensor>>);
 
 impl Tensor {
-    fn new(data: Data, shape: Vec<usize>, op: Option<String>) -> Self {
+    fn new(data: Data, shape: Vec<usize>, op: Option<String>, requires_grad: bool) -> Self {
         let len = data.len();
         Tensor(Arc::new(RwLock::new(RawTensor {
             id: TensorId::new(),
             data,
             grad: vec![0.0; len],
-            requires_grad: true,
+            requires_grad,
             shape,
             op,
             ctx: None,
             children: vec![],
         })))
+    }
+
+    pub fn zero_grad_(&self) {
+        let n_grad = vec![0.0; self.0.read().unwrap().grad.len()];
+        self.0.write().unwrap().grad = n_grad;
+    }
+    pub fn step_(&self, lr: f32) {
+        let n_data: Data = self.0.read().unwrap().data.iter().zip(self.0.read().unwrap().grad.iter()).map(|(x, g)| x - lr * g).collect();
+        self.0.write().unwrap().data = n_data;
     }
 
     fn modify_grad_(&self) {
@@ -66,7 +75,7 @@ impl Tensor {
                 
                 fill_grad(0, 0, &self_grad, &self_shape, 0, &mut chd_grad, &chd_shape);
 
-                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad;
+                self.0.read().unwrap().children[0].0.write().unwrap().grad = chd_grad;
             }
             else if op == "pow" {
                 let self_grad = self.0.read().unwrap().grad.clone();
@@ -78,7 +87,7 @@ impl Tensor {
                     chd_grad[i] += exp * x.powf(exp - 1.0) * g;
                 }
 
-                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad;
+                self.0.read().unwrap().children[0].0.write().unwrap().grad = chd_grad;
             }
             else if op == "relu" {
                 let self_grad = self.0.read().unwrap().grad.clone();
@@ -89,7 +98,7 @@ impl Tensor {
                     chd_grad[i] += if *x > 0.0 { *g } else { 0.0 };
                 }
 
-                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad;
+                self.0.read().unwrap().children[0].0.write().unwrap().grad = chd_grad;
             }
             else if op == "neg" {
                 let self_grad = self.0.read().unwrap().grad.clone();
@@ -99,7 +108,7 @@ impl Tensor {
                     chd_grad[i] -= g;
                 }
 
-                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad;
+                self.0.read().unwrap().children[0].0.write().unwrap().grad = chd_grad;
             }
             else if op == "add" {
                 let self_grad = self.0.read().unwrap().grad.clone();
@@ -111,8 +120,8 @@ impl Tensor {
                     chd_grad_2[i] += g;
                 }
 
-                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad_1;
-                self.0.write().unwrap().children[1].0.write().unwrap().grad = chd_grad_2;
+                self.0.read().unwrap().children[0].0.write().unwrap().grad = chd_grad_1;
+                self.0.read().unwrap().children[1].0.write().unwrap().grad = chd_grad_2;
             }
             else if op == "mul" {
                 let self_grad = self.0.read().unwrap().grad.clone();
@@ -126,8 +135,8 @@ impl Tensor {
                     chd_grad_2[i] += chd_data_1[i] * g;
                 }
 
-                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad_1;
-                self.0.write().unwrap().children[1].0.write().unwrap().grad = chd_grad_2;
+                self.0.read().unwrap().children[0].0.write().unwrap().grad = chd_grad_1;
+                self.0.read().unwrap().children[1].0.write().unwrap().grad = chd_grad_2;
             }
             // TODO: need rigorous analysis
             else if op == "matmul" {
@@ -148,8 +157,18 @@ impl Tensor {
                     }
                 }
 
-                self.0.write().unwrap().children[0].0.write().unwrap().grad = chd_grad_1;
-                self.0.write().unwrap().children[1].0.write().unwrap().grad = chd_grad_2;
+                self.0.read().unwrap().children[0].0.write().unwrap().grad = chd_grad_1;
+                self.0.read().unwrap().children[1].0.write().unwrap().grad = chd_grad_2;
+            }
+            else if op == "sum" {
+                let self_grad = self.0.read().unwrap().grad.clone();
+                let mut chd_grad = self.0.read().unwrap().children[0].0.read().unwrap().grad.clone();
+
+                for (i, g) in self_grad.iter().enumerate() {
+                    chd_grad[i] += g;
+                }
+
+                self.0.read().unwrap().children[0].0.write().unwrap().grad = chd_grad;
             }
             else { panic!("Unknown op: {}", op); }
         }
@@ -180,7 +199,7 @@ impl Tensor {
             None => StdRng::from_entropy(),
         };
         let data = (0..shape.iter().product::<usize>()).map(|_| rng.gen_range(low..high)).collect();
-        Tensor::new(data, shape, None)
+        Tensor::new(data, shape, None, true)
     }
 
     // https://pytorch.org/docs/stable/_modules/torch/nn/init.html#kaiming_uniform_
@@ -231,8 +250,12 @@ impl Tensor {
         fill_data(0, 0, &self.0.read().unwrap().data, &self_shape, 0, &mut self_data_br, &out_shape);
         fill_data(0, 0, &other.0.read().unwrap().data, &other_shape, 0, &mut other_data_br, &out_shape);
         
-        let self_br = Tensor::new(self_data_br, out_shape.clone(), Some("broadcast".to_string()));
-        let other_br = Tensor::new(other_data_br, out_shape.clone(), Some("broadcast".to_string()));
+        let self_br = Tensor::new(self_data_br, out_shape.clone(), Some("broadcast".to_string()), self.0.read().unwrap().requires_grad);
+        let other_br = Tensor::new(other_data_br, out_shape.clone(), Some("broadcast".to_string()), other.0.read().unwrap().requires_grad);
+        {
+            self_br.0.write().unwrap().children.push(self.clone());
+            other_br.0.write().unwrap().children.push(other.clone());
+        }
         {
             self_br.0.write().unwrap().children.push(self.clone());
             other_br.0.write().unwrap().children.push(other.clone());
@@ -256,7 +279,7 @@ impl PartialEq for Tensor {
 impl Tensor {
     fn pow_(&self, exp: f32) -> Tensor {
         let data: Data = Data { data: self.0.read().unwrap().data.iter().map(|x| x.powf(exp)).collect() };
-        let out = Tensor::new(data, self.0.read().unwrap().shape.clone(), Some("pow".to_string()));
+        let out = Tensor::new(data, self.0.read().unwrap().shape.clone(), Some("pow".to_string()), self.0.read().unwrap().requires_grad);
         out.0.write().unwrap().ctx = Some(exp);
         {
             out.0.write().unwrap().children.push(self.clone());
@@ -266,7 +289,7 @@ impl Tensor {
 
     fn relu_(&self) -> Tensor {
         let data: Data = Data { data: self.0.read().unwrap().data.iter().map(|x| x.max(0.0)).collect() };
-        let out = Tensor::new(data, self.0.read().unwrap().shape.clone(), Some("relu".to_string()));
+        let out = Tensor::new(data, self.0.read().unwrap().shape.clone(), Some("relu".to_string()), self.0.read().unwrap().requires_grad);
         {
             out.0.write().unwrap().children.push(self.clone());
         }
@@ -278,7 +301,7 @@ impl Neg for Tensor {
     type Output = Tensor;
     fn neg(self) -> Self::Output {
         let data: Data = Data { data: self.0.read().unwrap().data.iter().map(|x| -x).collect() };
-        let out = Tensor::new(data, self.0.read().unwrap().shape.clone(), Some("neg".to_string()));
+        let out = Tensor::new(data, self.0.read().unwrap().shape.clone(), Some("neg".to_string()), self.0.read().unwrap().requires_grad);
         {
             out.0.write().unwrap().children.push(self.clone());
         }
@@ -293,7 +316,7 @@ impl Add<Tensor> for Tensor {
     fn add(self, other: Tensor) -> Self::Output {
         let (self_br, other_br) = self.broadcast_(&other);
         let data: Data = Data { data: self_br.0.read().unwrap().data.iter().zip(other_br.0.read().unwrap().data.iter()).map(|(x, y)| x + y).collect() };
-        let out = Tensor::new(data, self_br.0.read().unwrap().shape.clone(), Some("add".to_string()));
+        let out = Tensor::new(data, self_br.0.read().unwrap().shape.clone(), Some("add".to_string()), self_br.0.read().unwrap().requires_grad || other_br.0.read().unwrap().requires_grad);
         {
             out.0.write().unwrap().children.push(self_br);
             out.0.write().unwrap().children.push(other_br);
@@ -312,7 +335,7 @@ impl Mul<Tensor> for Tensor {
     fn mul(self, other: Tensor) -> Self::Output {
         let (self_br, other_br) = self.broadcast_(&other);
         let data: Data = Data { data: self_br.0.read().unwrap().data.iter().zip(other_br.0.read().unwrap().data.iter()).map(|(x, y)| x * y).collect() };
-        let out = Tensor::new(data, self_br.0.read().unwrap().shape.clone(), Some("mul".to_string()));
+        let out = Tensor::new(data, self_br.0.read().unwrap().shape.clone(), Some("mul".to_string()), self_br.0.read().unwrap().requires_grad || other_br.0.read().unwrap().requires_grad);
         {
             out.0.write().unwrap().children.push(self_br);
             out.0.write().unwrap().children.push(other_br);
@@ -450,7 +473,7 @@ impl Tensor {
             }
         }
 
-        let out = Tensor::new(out_data, vec![dim_0, dim_2], Some("matmul".to_string()));
+        let out = Tensor::new(out_data, vec![dim_0, dim_2], Some("matmul".to_string()), self.0.read().unwrap().requires_grad || other.0.read().unwrap().requires_grad);
         {
             out.0.write().unwrap().children.push(self.clone());
             out.0.write().unwrap().children.push(other.clone());
@@ -465,13 +488,13 @@ impl Tensor {
     // https://pytorch.org/docs/stable/generated/torch.sum.html
     fn sum_(&self) -> Tensor {
         let data: Data = Data { data: vec![self.0.read().unwrap().data.iter().sum()] };
-        let out = Tensor::new(data, vec![], Some("sum".to_string()));
+        let out = Tensor::new(data, vec![], Some("sum".to_string()), self.0.read().unwrap().requires_grad);
         out.0.write().unwrap().children.push(self.clone());
         out
     }
     // https://pytorch.org/docs/stable/generated/torch.mean.html
     fn mean_(&self) -> Tensor {
-        let out = self.sum_() / Tensor::new(Data { data: vec![self.0.read().unwrap().data.len() as f32] }, vec![], None);
+        let out = self.sum_() / Tensor::new(Data { data: vec![self.0.read().unwrap().data.len() as f32] }, vec![], None, false);
         out
     }
 }
@@ -534,9 +557,9 @@ fn print_data(tensor: &Tensor) -> String {
 #[pymethods]
 impl Tensor {
     #[new]
-    fn __init__(data: List<f32>) -> PyResult<Self> {
+    fn __init__(data: List<f32>, requires_grad: Option<bool>) -> PyResult<Self> {
         let (data, shape) = process_list(data);
-        Ok(Self::new(Data { data }, shape, None))
+        Ok(Self::new(Data { data }, shape, None, requires_grad.unwrap_or(false)))
     }
 
     fn __str__(&self) -> PyResult<String> {
@@ -544,9 +567,9 @@ impl Tensor {
     }
 
     fn numpy(&self) -> PyResult<Py<PyArrayDyn<f32>>> {
-        let data = self.0.read().unwrap();
-        let shape = data.shape.clone();
-        let data = data.data.data.clone();
+        let self_read = self.0.read().unwrap();
+        let shape = self_read.shape.clone();
+        let data = self_read.data.data.clone();
 
         Python::with_gil(|py| {
             let array = PyArray::from_vec(py, data).reshape(shape)?.to_dyn();
@@ -555,9 +578,16 @@ impl Tensor {
     }
 
     #[getter]
-    fn data(&self) -> PyResult<Vec<f32>> { Ok(self.0.read().unwrap().data.data.clone()) }
-    #[getter]
-    fn grad(&self) -> PyResult<Vec<f32>> { Ok(self.0.read().unwrap().grad.clone()) }
+    fn grad(&self) -> PyResult<Py<PyArrayDyn<f32>>> {
+        let self_read = self.0.read().unwrap();
+        let shape = self_read.shape.clone();
+        let grad = self_read.grad.clone();
+
+        Python::with_gil(|py| {
+            let array = PyArray::from_vec(py, grad).reshape(shape)?.to_dyn();
+            Ok(array.to_owned())
+        })
+    }
     #[getter]
     fn shape(&self) -> PyResult<Vec<usize>> { Ok(self.0.read().unwrap().shape.clone()) }
 
@@ -595,7 +625,7 @@ impl Tensor {
     fn reshape(&self, shape: Vec<usize>) -> PyResult<Tensor> { 
         let len = self.0.read().unwrap().data.len();
         assert_eq!(len, shape.iter().product::<usize>(), "Tensor dimensions must match");
-        Ok(Tensor::new(self.0.read().unwrap().data.clone(), shape, None))
+        Ok(Tensor::new(self.0.read().unwrap().data.clone(), shape, None, self.0.read().unwrap().requires_grad))
     }
 
     // functional nn ops
