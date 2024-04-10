@@ -219,16 +219,17 @@ impl Tensor {
         let mut other_data_br: Data = Data { data: vec![0.0; out_shape.iter().product::<usize>() as usize] };
 
         fn fill_data(dep: usize, idx: usize, data: &Data, shape: &Vec<usize>, out_idx: usize, out_data: &mut Data, out_shape: &Vec<usize>) {
+            if dep == shape.len() { out_data.data[out_idx] = data.data[idx]; return; }
+
             for i in 0..out_shape[dep] {
                 let n_idx = idx * shape[dep] + (i % shape[dep]);
                 let n_out_idx = out_idx * out_shape[dep] + i;
 
-                if dep > 0 { fill_data(dep - 1, n_idx, data, shape, n_out_idx, out_data, out_shape); }
-                else { out_data[out_idx] = data[idx]; }
+                fill_data(dep + 1, n_idx, data, shape, n_out_idx, out_data, out_shape);
             }
         }
-        fill_data(self_shape.len() - 1, 0, &self.0.read().unwrap().data, &self_shape, 0, &mut self_data_br, &out_shape);
-        fill_data(other_shape.len() - 1, 0, &other.0.read().unwrap().data, &other_shape, 0, &mut other_data_br, &out_shape);
+        fill_data(0, 0, &self.0.read().unwrap().data, &self_shape, 0, &mut self_data_br, &out_shape);
+        fill_data(0, 0, &other.0.read().unwrap().data, &other_shape, 0, &mut other_data_br, &out_shape);
         
         let self_br = Tensor::new(self_data_br, out_shape.clone(), Some("broadcast".to_string()));
         let other_br = Tensor::new(other_data_br, out_shape.clone(), Some("broadcast".to_string()));
