@@ -553,6 +553,16 @@ impl Tensor {
     #[staticmethod] 
     fn kaiming_uniform(shape: Vec<usize>, a: f32, seed: Option<u64>) -> PyResult<Tensor> { Ok(Tensor::kaiming_uniform_(shape, a, seed)) }
 
+    // movement ops
+    // TODO: do not copy data, just change shape
+    // TODO: if shape contains -1, then it will be calculated automatically
+    // TODO: if shape is not compatible, then it will raise an error
+    fn reshape(&self, shape: Vec<usize>) -> PyResult<Tensor> { 
+        let len = self.0.read().unwrap().data.len();
+        assert_eq!(len, shape.iter().product::<usize>(), "Tensor dimensions must match");
+        Ok(Tensor::new(self.0.read().unwrap().data.clone(), shape, None))
+    }
+
     // unary ops
     fn pow(&self, exp: f32) -> PyResult<Tensor> { Ok(self.pow_(exp)) }
     fn relu(&self) -> PyResult<Tensor> { Ok(self.relu_()) }
