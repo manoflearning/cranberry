@@ -10,6 +10,9 @@ class Linear:
     def __call__(self, x: cb.Tensor) -> cb.Tensor:
         return x.linear(weight=self.weight, bias=self.bias)
 
+    def __str__(self):
+        return f"Linear(in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, bias={self.bias is not None})"        
+
 class ReLU:
     def __call__(self, x: cb.Tensor) -> cb.Tensor:
         return x.relu()

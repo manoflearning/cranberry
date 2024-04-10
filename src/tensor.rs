@@ -18,6 +18,7 @@ struct RawTensor {
     id: TensorId,
     data: Data,
     grad: Vec<f32>,
+    requires_grad: bool,
     shape: Vec<usize>,
     op: Option<String>,
     ctx: Option<f32>,
@@ -35,6 +36,7 @@ impl Tensor {
             id: TensorId::new(),
             data,
             grad: vec![0.0; len],
+            requires_grad: true,
             shape,
             op,
             ctx: None,
@@ -493,6 +495,24 @@ fn process_list(list: List<f32>) -> (Vec<f32>, Vec<usize>) {
     }
 }
 
+// TODO: need high readable print_data
+fn print_data(tensor: &Tensor) -> String {
+    fn formulate_string(data: &Data, shape: &Vec<usize>, idx: usize, dep: usize) -> String {
+        if dep == shape.len() { return format!(" {:.4}", data[idx]); }
+        let mut out = String::from("[");
+        for i in 0..shape[dep] {
+            out.push_str(&formulate_string(data, shape, idx * shape[dep] + i, dep + 1));
+            if i < shape[dep] - 1 {
+                out.push_str(",");
+                // if shape.len() == dep + 2 { out.push_str("\n"); }
+            }
+        }
+        out.push_str("]");
+        out
+    }
+    formulate_string(&tensor.0.read().unwrap().data, &tensor.0.read().unwrap().shape, 0, 0)
+}
+
 #[pymethods]
 impl Tensor {
     #[new]
@@ -501,9 +521,8 @@ impl Tensor {
         Ok(Self::new(Data { data }, shape, None))
     }
 
-    // TODO: we need better __repr__
-    fn __repr__(&self) -> PyResult<String> {
-        Ok(format!("Tensor(data={:?}, shape={:?})", self.0.read().unwrap().data.data, self.0.read().unwrap().shape))
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!("tensor({}, requires_grad={:?})", print_data(self), self.0.read().unwrap().requires_grad))
     }
 
     fn numpy(&self) { unimplemented!() }
