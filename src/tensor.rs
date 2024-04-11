@@ -601,6 +601,8 @@ impl Tensor {
     }
     #[getter]
     fn shape(&self) -> PyResult<Vec<usize>> { Ok(self.0.read().unwrap().shape.clone()) }
+    #[getter]
+    fn requires_grad(&self) -> PyResult<bool> { Ok(self.0.read().unwrap().requires_grad) }
 
     fn __eq__(&self, other: &Tensor) -> PyResult<bool> { Ok(self == other) }
 
