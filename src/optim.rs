@@ -10,19 +10,13 @@ pub struct SGD {
 #[pymethods]
 impl SGD {
     #[new]
-    fn new(params: Vec<Tensor>, lr: f32) -> PyResult<Self> {
-        Ok(Self { params, lr })
-    }
+    fn new(params: Vec<Tensor>, lr: f32) -> PyResult<Self> { Ok(Self { params, lr }) }
 
     fn zero_grad(&self) {
-        for param in &self.params {
-            param.zero_grad_();
-        }
+        for param in &self.params { param.zero_grad_(); }
     }
 
     fn step(&self) {
-        for param in &self.params {
-            param.step_(self.lr);
-        }
+        for param in &self.params { param.step_(self.lr); }
     }
 }

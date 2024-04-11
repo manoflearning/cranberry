@@ -1,7 +1,7 @@
 use std::ops::{Deref, Index, IndexMut, Range, RangeFrom};
 
 #[repr(align(64))] // for SIMD and cache alignment
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Data {
     pub(crate) data: Vec<f32>,
 }

@@ -46,11 +46,15 @@ impl Tensor {
     }
 
     pub fn zero_grad_(&self) {
+        if !self.0.read().unwrap().requires_grad { return; }
         let n_grad = vec![0.0; self.0.read().unwrap().grad.len()];
         self.0.write().unwrap().grad = n_grad;
     }
     pub fn step_(&self, lr: f32) {
-        let n_data: Data = self.0.read().unwrap().data.iter().zip(self.0.read().unwrap().grad.iter()).map(|(x, g)| x - lr * g).collect();
+        if !self.0.read().unwrap().requires_grad { return; }
+        let self_data = self.0.read().unwrap().data.clone();
+        let self_grad = self.0.read().unwrap().grad.clone();
+        let n_data: Data = self_data.iter().zip(self_grad.iter()).map(|(x, g)| x - lr * g).collect();
         self.0.write().unwrap().data = n_data;
     }
 
@@ -573,6 +577,17 @@ impl Tensor {
         })
     }
 
+    #[getter]
+    fn data(&self) -> PyResult<Py<PyArrayDyn<f32>>> {
+        let self_read = self.0.read().unwrap();
+        let shape = self_read.shape.clone();
+        let data = self_read.data.data.clone();
+
+        Python::with_gil(|py| {
+            let array = PyArray::from_vec(py, data).reshape(shape)?.to_dyn();
+            Ok(array.to_owned())
+        })
+    }
     #[getter]
     fn grad(&self) -> PyResult<Py<PyArrayDyn<f32>>> {
         let self_read = self.0.read().unwrap();
