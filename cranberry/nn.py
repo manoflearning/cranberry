@@ -19,3 +19,6 @@ class Linear:
 class ReLU:
     def __call__(self, x: cb.Tensor) -> cb.Tensor:
         return x.relu()
+    
+    def parameters(self):
+        return []
