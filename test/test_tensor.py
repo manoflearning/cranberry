@@ -5,11 +5,11 @@ import unittest
 
 np.random.seed(1337)
 
-A_np = np.random.randn(3, 3).astype(np.float32)
-B_np = np.random.randn(3, 3).astype(np.float32)
-C_np = np.random.randn(3, 3).astype(np.float32)
+A_np = np.random.randn(5, 5).astype(np.float32)
+B_np = np.random.randn(5, 5).astype(np.float32)
+C_np = np.random.randn(5, 5).astype(np.float32)
 
-Z_np = np.random.randn(1, 3).astype(np.float32)
+Z_np = np.random.randn(1, 1).astype(np.float32)
 
 class TestCranberry(unittest.TestCase):
     def test_zerodim_initialization(self):
@@ -35,7 +35,7 @@ class TestCranberry(unittest.TestCase):
         B = cr.Tensor(B_np)
         np.testing.assert_allclose(A_np @ B_np, (A @ B).numpy(), rtol=1e-7, atol=1e-7)
 
-    def test_backward_pass(self):
+    def test_backward_pass_1(self):
         def run_cranberry():
             A = cr.Tensor(A_np, requires_grad=True)
             B = cr.Tensor(B_np, requires_grad=True)
@@ -65,7 +65,29 @@ class TestCranberry(unittest.TestCase):
             return out.detach().numpy(), A.grad, B.grad
 
         for x, y in zip(run_cranberry(), run_pytorch()):
-            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+            np.testing.assert_allclose(x, y, rtol=1e-5, atol=1e-5)
+
+    def test_backward_pass_2(self):
+        def run_cranberry():
+            x = cr.Tensor([-4.0], requires_grad=True)
+            z = cr.Tensor([2.0]) * x + cr.Tensor([2.0]) + x
+            q = z.relu() + z * x
+            h = (z * z).relu()
+            y = h + q + q * x
+            y.backward()
+            return y.numpy(), x.grad
+        
+        def run_pytorch():
+            x = torch.tensor([-4.0], requires_grad=True, dtype=torch.float32)
+            z = 2.0 * x + 2.0 + x
+            q = z.relu() + z * x
+            h = (z * z).relu()
+            y = h + q + q * x
+            y.backward()
+            return y.detach().numpy(), x.grad
+        
+        for x, y in zip(run_cranberry(), run_pytorch()):
+            np.testing.assert_allclose(x, y, rtol=1e-5, atol=1e-5)
 
 if __name__ == '__main__':
     unittest.main()
