@@ -80,7 +80,7 @@ impl Tensor {
         let data: Vec<f32> = (0..shape.iter().product()).map(|_| rand::random::<f32>() * (high - low) + low).collect();
         Tensor::new(
             Storage::new(data), 
-            shape.clone(),
+            shape,
             true,
             None
         )
@@ -88,8 +88,8 @@ impl Tensor {
     // https://pytorch.org/docs/stable/_modules/torch/nn/init.html#kaiming_uniform_
     fn kaiming_uniform_(shape: Vec<usize>, a: f32, seed: Option<u64>) -> Tensor {
         let bound = (3.0 as f32).powf(0.5) 
-        * (2.0 / (1.0 + a.powf(2.0))).powf(0.5) 
-        / (shape.iter().product::<usize>() as f32 / shape[0] as f32).powf(0.5);
+            * (2.0 / (1.0 + a.powf(2.0))).powf(0.5) 
+            / (shape.iter().product::<usize>() as f32 / shape[0] as f32).powf(0.5);
         Tensor::uniform_(shape, -bound, bound, seed)
     }
 
@@ -211,7 +211,7 @@ impl Tensor {
                         &prev_shape);
                 }
             ),
-            Some(Ops::Broadcast)
+            Some(Ops::Broadcast),
         )))
     }
     // https://numpy.org/doc/stable/user/basics.broadcasting.html
@@ -273,7 +273,7 @@ impl Add<Tensor> for Tensor {
                         { now.0.storage.read().unwrap().add_back(&mut prev[1].0.storage.write().unwrap()); }
                     }
                 ),
-                Some(Ops::Add)
+                Some(Ops::Add),
             ))
         )
     }
@@ -310,7 +310,7 @@ impl Mul<Tensor> for Tensor {
                     }
                 }
             ),
-            Some(Ops::Mul)
+            Some(Ops::Mul),
         )))
     }
 }
@@ -362,7 +362,7 @@ impl Tensor {
                     }
                 }
             ),
-            Some(Ops::Matmul)
+            Some(Ops::Matmul),
         )))
     }
     // https://pytorch.org/docs/stable/generated/torch.matmul.html
@@ -424,7 +424,7 @@ impl Tensor {
                         now.0.storage.read().unwrap().pow_back(&mut prev[0].0.storage.write().unwrap());
                     }
                 ),
-                Some(Ops::Pow)
+                Some(Ops::Pow),
             ))
         )
     }
@@ -441,7 +441,7 @@ impl Tensor {
                         now.0.storage.read().unwrap().relu_back(&mut prev[0].0.storage.write().unwrap());
                     }
                 ),
-                Some(Ops::Relu)
+                Some(Ops::Relu),
             ))
         )
     }
@@ -462,7 +462,7 @@ impl Neg for Tensor {
                         now.0.storage.read().unwrap().neg_back(&mut prev[0].0.storage.write().unwrap());
                     }
                 ),
-                Some(Ops::Neg)
+                Some(Ops::Neg),
             ))
         )
     }
@@ -487,7 +487,7 @@ impl Tensor {
                         now.0.storage.read().unwrap().sum_back(&mut prev[0].0.storage.write().unwrap());
                     }
                 ),
-                Some(Ops::Sum)
+                Some(Ops::Sum),
             ))
         )
     }
@@ -496,7 +496,7 @@ impl Tensor {
         let num = Tensor::new(
             Storage::new(vec![self.len_() as f32]),
             vec![],
-            self.0.requires_grad,
+            false,
             None,
         );
         self.sum_() / num
@@ -511,20 +511,24 @@ impl Tensor {
     // https://pytorch.org/docs/stable/generated/torch.reshape.html
     // TODO: if shape contains -1, then it will be calculated automatically
     // TODO: what if reshape is called on a tensor that requires grad?
-    fn reshape_(&self, shape: Vec<usize>) -> Tensor {
-        assert!(self.len_() == shape.iter().product(), "cannot reshape tensor of size {} into shape {:?}", self.len_(), shape);
+    fn reshape_(&self, n_shape: Vec<usize>) -> Tensor {
+        assert!(self.len_() == n_shape.iter().product(), "cannot reshape tensor of size {} into shape {:?}", self.len_(), n_shape);
 
-        let storage = self.0.storage.read().unwrap().deref().clone();
-        Tensor::new(
-            storage,
-            shape.clone(),
-            self.0.requires_grad,
-            Some(Context::new(
-                vec![self.clone()], 
-                Some(|_, _| { return; }),
-                Some(Ops::Reshape)
+        Tensor {
+            0: Arc::new(
+                RawTensor {
+                    id: TensorId::new(),
+                    storage: self.0.storage.clone(),
+                    requires_grad: self.0.requires_grad,
+                    ctx: Some(Context::new(
+                        vec![self.clone()], 
+                        Some(|_, _| { return; }),
+                        Some(Ops::Reshape),
+                    )),
+                    shape: n_shape,
+                }
             )
-        ))
+        }
     }
 
     // https://pytorch.org/docs/stable/generated/torch.transpose.html
@@ -543,9 +547,9 @@ impl Tensor {
 // ********************************************************
 
 impl Tensor {
-    fn linear_(&self, weight: Tensor, bias: Option<Tensor>) -> Tensor {
+    fn linear_(&self, weight: &Tensor, bias: Option<&Tensor>) -> Tensor {
         let mut out = self.clone().matmul_(&weight);
-        if let Some(bias) = bias { out = out + bias; }
+        if let Some(bias) = bias { out = out + bias.clone(); }
         out
     }
 }
@@ -673,5 +677,5 @@ impl Tensor {
     fn transpose(&self, dim0: usize, dim1: usize) -> PyResult<Tensor> { Ok(self.transpose_(dim0, dim1)) }
 
     // functional nn ops
-    fn linear(&self, weight: Tensor, bias: Option<Tensor>) -> PyResult<Tensor> { Ok(self.linear_(weight, bias)) }
+    fn linear(&self, weight: &Tensor, bias: Option<&Tensor>) -> PyResult<Tensor> { Ok(self.linear_(weight, bias)) }
 }

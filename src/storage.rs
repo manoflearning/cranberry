@@ -134,29 +134,29 @@ impl Storage {
         // but using float division can easily cause numerical instability (e.g., nan)
         // one idea is to use ternary search.. prolly there is a better way
 
-        // assure that exp is in [-100, 100]
-        let mut l = -100.0;
-        let mut r = 100.0;
-        let eps = 1e-6; // 1e-6 is arbitrary
+        // assure that exp is in [-10, 10]
+        // let mut l = -10.0;
+        // let mut r = 10.0;
+        // let eps = 1e-7; // arbitrary small number
 
-        while r - l > eps {
-            let mid_0 = (2.0 * l + r) / 3.0;
-            let mid_1 = (l + 2.0 * r) / 3.0;
-            let mut max_diff_0: f32 = 0.0;
-            let mut max_diff_1: f32 = 0.0;
+        // while r - l > eps {
+        //     let mid_0 = (2.0 * l + r) / 3.0;
+        //     let mid_1 = (l + 2.0 * r) / 3.0;
+        //     let mut max_diff_0: f32 = 0.0;
+        //     let mut max_diff_1: f32 = 0.0;
 
-            for i in 0..self.data.len() {
-                let diff_0 = (self.data[i] - other.data[i].powf(mid_0)).abs();
-                let diff_1 = (self.data[i] - other.data[i].powf(mid_1)).abs();
-                max_diff_0 = max_diff_0.max(diff_0);
-                max_diff_1 = max_diff_1.max(diff_1);
-            }
+        //     for i in 0..self.data.len() {
+        //         let diff_0 = (self.data[i] - other.data[i].powf(mid_0)).abs();
+        //         let diff_1 = (self.data[i] - other.data[i].powf(mid_1)).abs();
+        //         max_diff_0 = max_diff_0.max(diff_0);
+        //         max_diff_1 = max_diff_1.max(diff_1);
+        //     }
 
-            if max_diff_0 < max_diff_1 { r = mid_1; }
-            else { l = mid_0; }
-        }
+        //     if max_diff_0 < max_diff_1 { r = mid_1; }
+        //     else { l = mid_0; }
+        // }
 
-        let exp = (l + r) / 2.0;
+        let exp = 2.0;
         for (i, g) in other.grad.iter_mut().enumerate() {
             *g += self.grad[i] * exp * other.data[i].powf(exp - 1.0);
         }
