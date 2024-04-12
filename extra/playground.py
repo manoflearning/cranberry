@@ -1,13 +1,18 @@
-import cranberry as cb
+import cranberry as cr
+from cranberry import nn
+from cranberry import SGD
+import torch
 import numpy as np
 
-list = [[1, 1, 1]]
+A = np.ones((2, 3))
+B = np.ones((3))
 
-a = cb.Tensor(np.array(list))
-b = cb.Tensor([3, 2, 2])
+P = cr.Tensor(A)
+Q = cr.Tensor(B)
 
-c = a * b
+print(A + B)
+print((P + Q).numpy())
 
-print(c)
-print(c.shape)
-print(c.grad)
+optimizer = cr.SGD([P, Q], lr=0.1)
+
+optimizer.step()
