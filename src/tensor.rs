@@ -80,14 +80,17 @@ impl Tensor {
         let data: Vec<f32> = (0..shape.iter().product()).map(|_| rand::random::<f32>() * (high - low) + low).collect();
         Tensor::new(
             Storage::new(data), 
-            shape.clone(), 
-            false, 
+            shape.clone(),
+            true,
             None
         )
     }
     // https://pytorch.org/docs/stable/_modules/torch/nn/init.html#kaiming_uniform_
-    fn kaiming_uniform_(_shape: Vec<usize>, _a: f32, _seed: Option<u64>) -> Tensor {
-        unimplemented!()
+    fn kaiming_uniform_(shape: Vec<usize>, a: f32, seed: Option<u64>) -> Tensor {
+        let bound = (3.0 as f32).powf(0.5) 
+        * (2.0 / (1.0 + a.powf(2.0))).powf(0.5) 
+        / (shape.iter().product::<usize>() as f32 / shape[0] as f32).powf(0.5);
+        Tensor::uniform_(shape, -bound, bound, seed)
     }
 
     pub fn zero_grad_(&self) { self.0.storage.write().unwrap().init_grad_to_zero(); }
@@ -183,7 +186,12 @@ impl Tensor {
         Some(Context::new(
             vec![self.clone()], 
             Some(
-                |now, prev| {                 
+                |now, prev| {
+                    let mut prev_shape = prev[0].0.shape.clone();
+                    while prev_shape.len() < now.0.shape.len() {
+                        prev_shape.insert(0, 1);
+                    }
+
                     fn fill_grad(dep: usize, now_idx: usize, now_grad: &Vec<f32>, now_shape: &Vec<usize>, prev_idx: usize, prev_grad: &mut Vec<f32>, prev_shape: &Vec<usize>) {
                         if dep == now_shape.len() { prev_grad[prev_idx] += now_grad[now_idx]; return; }
 
@@ -200,7 +208,7 @@ impl Tensor {
                         &now.0.shape, 
                         0, 
                         &mut prev[0].0.storage.write().unwrap().get_grad_mut(), 
-                        &prev[0].0.shape);
+                        &prev_shape);
                 }
             ),
             Some(Ops::Broadcast)
@@ -518,6 +526,16 @@ impl Tensor {
             )
         ))
     }
+
+    // https://pytorch.org/docs/stable/generated/torch.transpose.html
+    fn transpose_(&self, dim0: usize, dim1: usize) -> Tensor {
+        assert!(dim0 < self.0.shape.len() && dim1 < self.0.shape.len(), "dimension out of range");
+
+        let mut n_shape = self.0.shape.clone();
+        n_shape.swap(dim0, dim1);
+
+        self.reshape_(n_shape)
+    }
 }
 
 // ********************************************************
@@ -652,6 +670,7 @@ impl Tensor {
 
     // movement ops
     fn reshape(&self, shape: Vec<usize>) -> PyResult<Tensor> {  Ok(self.reshape_(shape)) }
+    fn transpose(&self, dim0: usize, dim1: usize) -> PyResult<Tensor> { Ok(self.transpose_(dim0, dim1)) }
 
     // functional nn ops
     fn linear(&self, weight: Tensor, bias: Option<Tensor>) -> PyResult<Tensor> { Ok(self.linear_(weight, bias)) }
