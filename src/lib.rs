@@ -2,9 +2,15 @@
 use pyo3::prelude::*;
 use thread_priority::*;
 
+mod ops;
+use ops::Ops;
+
+mod storage;
+use storage::Storage;
+
 mod tensor;
 use tensor::Tensor;
-mod data;
+
 mod optim;
 use optim::SGD;
 

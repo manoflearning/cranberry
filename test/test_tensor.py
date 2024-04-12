@@ -48,7 +48,7 @@ class TestCranberry(unittest.TestCase):
             out = out.pow(4)
             out = out.sum()
             out.backward()
-            return out.numpy(), A.grad, B.grad
+            return out.detach().numpy(), A.grad, B.grad
         
         def run_pytorch():
             A = torch.tensor(A_np, requires_grad=True)
@@ -69,16 +69,16 @@ class TestCranberry(unittest.TestCase):
 
     def test_backward_pass_2(self):
         def run_cranberry():
-            x = cr.Tensor([-4.0], requires_grad=True)
-            z = cr.Tensor([2.0]) * x + cr.Tensor([2.0]) + x
+            x = cr.Tensor(-4.0, requires_grad=True)
+            z = cr.Tensor(2.0) * x + cr.Tensor(2.0) + x
             q = z.relu() + z * x
             h = (z * z).relu()
             y = h + q + q * x
             y.backward()
-            return y.numpy(), x.grad
-        
+            return y.detach().numpy(), x.grad
+
         def run_pytorch():
-            x = torch.tensor([-4.0], requires_grad=True, dtype=torch.float32)
+            x = torch.tensor(-4.0, requires_grad=True, dtype=torch.float32)
             z = 2.0 * x + 2.0 + x
             q = z.relu() + z * x
             h = (z * z).relu()
