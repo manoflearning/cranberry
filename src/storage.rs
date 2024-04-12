@@ -81,23 +81,42 @@ impl Storage {
 
         Storage::new(out_data)
     }
-    pub fn matmul_2d_back(&self, o0: &mut Storage, o1: &mut Storage, dim: Vec<usize>) {
+    pub fn matmul_2d_back_0(&self, o0: &mut Storage, o1: &Storage, dim: Vec<usize>) {
         let self_grad = self.grad.clone();
-        let o0_data = o0.data.clone();
+        // let o0_data = o0.data.clone();
         let o1_data = o1.data.clone();
         let mut o0_grad = o0.grad.clone();
-        let mut o1_grad = o1.grad.clone();
+        // let mut o1_grad = o1.grad.clone();
 
         for i in 0..dim[0] {
             for j in 0..dim[2] {
                 for k in 0..dim[1] {
                     o0_grad[i*dim[1]+k] += o1_data[k*dim[2]+j] * self_grad[i*dim[2]+j];
-                    o1_grad[k*dim[2]+j] += o0_data[i*dim[1]+k] * self_grad[i*dim[2]+j];
+                    // o1_grad[k*dim[2]+j] += o0_data[i*dim[1]+k] * self_grad[i*dim[2]+j];
                 }
             }
         }
 
         o0.grad = o0_grad;
+        // o1.grad = o1_grad;
+    }
+    pub fn matmul_2d_back_1(&self, o0: &Storage, o1: &mut Storage, dim: Vec<usize>) {
+        let self_grad = self.grad.clone();
+        let o0_data = o0.data.clone();
+        // let o1_data = o1.data.clone();
+        // let mut o0_grad = o0.grad.clone();
+        let mut o1_grad = o1.grad.clone();
+
+        for i in 0..dim[0] {
+            for j in 0..dim[2] {
+                for k in 0..dim[1] {
+                    // o0_grad[i*dim[1]+k] += o1_data[k*dim[2]+j] * self_grad[i*dim[2]+j];
+                    o1_grad[k*dim[2]+j] += o0_data[i*dim[1]+k] * self_grad[i*dim[2]+j];
+                }
+            }
+        }
+
+        // o0.grad = o0_grad;
         o1.grad = o1_grad;
     }
 

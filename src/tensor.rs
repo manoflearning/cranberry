@@ -336,11 +336,22 @@ impl Tensor {
                     let dim_2 = prev[1].0.shape[1];
 
                     // if prev[0] == prev[1], it causes a thread panic (calls write twice)
-                    now.0.storage.read().unwrap().matmul_2d_back(
-                        &mut prev[0].0.storage.write().unwrap(), 
-                        &mut prev[1].0.storage.write().unwrap(), 
-                        vec![dim_0, dim_1, dim_2]
-                    );
+                    {
+                        let prev_1 = prev[1].0.storage.read().unwrap().clone();
+                        now.0.storage.read().unwrap().matmul_2d_back_0(
+                            &mut prev[0].0.storage.write().unwrap(), 
+                            &prev_1, 
+                            vec![dim_0, dim_1, dim_2]
+                        );
+                    }
+                    {
+                        let prev_0 = prev[0].0.storage.read().unwrap().clone();
+                        now.0.storage.read().unwrap().matmul_2d_back_1(
+                            &prev_0, 
+                            &mut prev[1].0.storage.write().unwrap(), 
+                            vec![dim_0, dim_1, dim_2]
+                        );
+                    }
                 }
             ),
             Some(Ops::Matmul)
