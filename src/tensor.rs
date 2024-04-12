@@ -154,7 +154,7 @@ impl Tensor {
 // ***************     broadcasting ops     ***************
 // ********************************************************
 
-// TODO: handle broadcasting using storage, not a tensor?
+// TODO: handle broadcasting using storage, not a tensor
 impl Tensor {
     fn expand_(&self, shape: &Vec<usize>) -> Tensor {
         fn fill_data(dep: usize, in_idx: usize, in_data: &Vec<f32>, in_shape: &Vec<usize>, out_idx: usize, out_data: &mut Vec<f32>, out_shape: &Vec<usize>) {
