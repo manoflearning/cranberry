@@ -533,6 +533,8 @@ impl Tensor {
 
     // https://pytorch.org/docs/stable/generated/torch.transpose.html
     fn transpose_(&self, dim0: usize, dim1: usize) -> Tensor {
+        unimplemented!();
+
         assert!(dim0 < self.0.shape.len() && dim1 < self.0.shape.len(), "dimension out of range");
 
         let mut n_shape = self.0.shape.clone();
