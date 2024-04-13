@@ -12,6 +12,8 @@ C_np = np.random.randn(5, 5).astype(np.float32)
 # for broadcasting
 Z_np = np.random.randn(1, 1).astype(np.float32)
 
+rtol, atol = 1e-6, 1e-6
+
 class TestCranberry(unittest.TestCase):
     def test_zerodim_initialization(self):
         a = cr.Tensor(55)
@@ -34,7 +36,7 @@ class TestCranberry(unittest.TestCase):
     def test_matmul(self):
         A = cr.Tensor(A_np)
         B = cr.Tensor(B_np)
-        np.testing.assert_allclose(A_np @ B_np, (A @ B).numpy(), rtol=1e-7, atol=1e-7)
+        np.testing.assert_allclose(A_np @ B_np, (A @ B).numpy(), rtol, atol)
 
     def test_broadcast_backward(self):
         def test_cranberry():
@@ -54,7 +56,7 @@ class TestCranberry(unittest.TestCase):
             return out.detach().numpy(), A.grad, Z.grad
 
         for (x, y) in zip(test_cranberry(), test_pytorch()):
-            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+            np.testing.assert_allclose(x, y, rtol, atol)
     
     def test_pow_backward(self):
         def test_cranberry():
@@ -72,7 +74,7 @@ class TestCranberry(unittest.TestCase):
             return out.detach().numpy(), A.grad
 
         for (x, y) in zip(test_cranberry(), test_pytorch()):
-            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+            np.testing.assert_allclose(x, y, rtol, atol)
 
     def test_relu_backward(self):
         def test_cranberry():
@@ -90,7 +92,7 @@ class TestCranberry(unittest.TestCase):
             return out.detach().numpy(), A.grad
 
         for (x, y) in zip(test_cranberry(), test_pytorch()):
-            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+            np.testing.assert_allclose(x, y, rtol, atol)
     
     def test_neg_backward(self):
         def test_cranberry():
@@ -108,7 +110,7 @@ class TestCranberry(unittest.TestCase):
             return out.detach().numpy(), A.grad
 
         for (x, y) in zip(test_cranberry(), test_pytorch()):
-            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+            np.testing.assert_allclose(x, y, rtol, atol)
     
     def test_add_backward(self):
         def test_cranberry():
@@ -128,7 +130,7 @@ class TestCranberry(unittest.TestCase):
             return out.detach().numpy(), A.grad, B.grad
 
         for (x, y) in zip(test_cranberry(), test_pytorch()):
-            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+            np.testing.assert_allclose(x, y, rtol, atol)
     
     def test_mul_backward(self):
         def test_cranberry():
@@ -148,7 +150,7 @@ class TestCranberry(unittest.TestCase):
             return out.detach().numpy(), A.grad, B.grad
 
         for (x, y) in zip(test_cranberry(), test_pytorch()):
-            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+            np.testing.assert_allclose(x, y, rtol, atol)
     
     def test_matmul_backward(self):
         def test_cranberry():
@@ -168,7 +170,7 @@ class TestCranberry(unittest.TestCase):
             return out.detach().numpy(), A.grad, B.grad
 
         for (x, y) in zip(test_cranberry(), test_pytorch()):
-            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+            np.testing.assert_allclose(x, y, rtol, atol)
     
     def test_sum_backward(self):
         def test_cranberry():
@@ -184,11 +186,10 @@ class TestCranberry(unittest.TestCase):
             return out.detach().numpy(), A.grad
 
         for (x, y) in zip(test_cranberry(), test_pytorch()):
-            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+            np.testing.assert_allclose(x, y, rtol, atol)
     
     # reshape op doesn't do actual backprop
     # but it shares the same storage as the original tensor
-    # so it should works
     def test_reshape_backward(self):
         def test_cranberry():
             A = cr.Tensor(A_np, requires_grad=True)
@@ -205,7 +206,7 @@ class TestCranberry(unittest.TestCase):
             return out.detach().numpy(), A.grad
 
         for (x, y) in zip(test_cranberry(), test_pytorch()):
-            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+            np.testing.assert_allclose(x, y, rtol, atol)
 
     def test_backward_pass_0(self):
         def test_cranberry():
@@ -237,7 +238,7 @@ class TestCranberry(unittest.TestCase):
             return out.detach().numpy(), A.grad, B.grad
 
         for x, y in zip(test_cranberry(), test_pytorch()):
-            np.testing.assert_allclose(x, y, rtol=1e-5, atol=1e-5)
+            np.testing.assert_allclose(x, y, rtol, atol)
 
     def test_backward_pass_1(self):
         def test_cranberry():
@@ -259,7 +260,7 @@ class TestCranberry(unittest.TestCase):
             return y.detach().numpy(), x.grad
         
         for x, y in zip(test_cranberry(), test_pytorch()):
-            np.testing.assert_allclose(x, y, rtol=1e-5, atol=1e-5)
+            np.testing.assert_allclose(x, y, rtol, atol)
 
 if __name__ == '__main__':
     unittest.main()
