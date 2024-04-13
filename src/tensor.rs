@@ -12,21 +12,55 @@ use std::sync::{Arc, RwLock};
 #[derive(Clone)]
 struct Context {
     prev: Vec<Tensor>,
-    walk_: Option<fn(&Tensor, Vec<&Tensor>)>,
-    _op: Option<Ops>,
+    op: Option<Ops>,
+    op_ctx: Option<f32>, // curently only for pow
 }
 
 impl Context {
-    fn new(prev: Vec<Tensor>, walk_: Option<fn(&Tensor, Vec<&Tensor>)>, op: Option<Ops>) -> Self {
+    fn new(prev: Vec<Tensor>, op: Option<Ops>, op_ctx: Option<f32>) -> Self {
         Self {
             prev,
-            walk_,
-            _op: op,
+            op,
+            op_ctx,
         }
     }
     fn walk(&self, now: &Tensor) { 
-        if let Some(walk_) = self.walk_ {
-            walk_(now, self.prev.iter().collect());
+        if let Some(op) = self.op {
+            match op {
+                Ops::Broadcast => now.0.storage.read().unwrap().broadcast_back(&mut self.prev[0].0.storage.write().unwrap(), now.0.shape.clone(), self.prev[0].0.shape.clone()),
+                Ops::Pow => now.0.storage.read().unwrap().pow_back(&mut self.prev[0].0.storage.write().unwrap(), self.op_ctx.unwrap()),
+                Ops::Relu => now.0.storage.read().unwrap().relu_back(&mut self.prev[0].0.storage.write().unwrap()),
+                Ops::Neg => now.0.storage.read().unwrap().neg_back(&mut self.prev[0].0.storage.write().unwrap()),
+                Ops::Add => self.prev.iter().for_each(|p| now.0.storage.read().unwrap().add_back(&mut p.0.storage.write().unwrap())),
+                Ops::Mul => {
+                    // to avoid the thread panic when prev[0] == prev[1]
+                    let prev_1 = self.prev[1].0.storage.read().unwrap().clone();
+                    now.0.storage.read().unwrap().mul_back(&mut self.prev[0].0.storage.write().unwrap(), &prev_1);
+                    let prev_0 = self.prev[0].0.storage.read().unwrap().clone();
+                    now.0.storage.read().unwrap().mul_back(&mut self.prev[1].0.storage.write().unwrap(), &prev_0);
+                }
+                Ops::Matmul => {
+                    let dim_0 = self.prev[0].0.shape[0];
+                    let dim_1 = self.prev[0].0.shape[1];
+                    let dim_2 = self.prev[1].0.shape[1];
+
+                    // to avoid the thread panic when prev[0] == prev[1]
+                    let prev_1 = self.prev[1].0.storage.read().unwrap().clone();
+                    now.0.storage.read().unwrap().matmul_2d_back_0(
+                        &mut self.prev[0].0.storage.write().unwrap(), 
+                        &prev_1, 
+                        vec![dim_0, dim_1, dim_2]
+                    );
+                    let prev_0 = self.prev[0].0.storage.read().unwrap().clone();
+                    now.0.storage.read().unwrap().matmul_2d_back_1(
+                        &prev_0, 
+                        &mut self.prev[1].0.storage.write().unwrap(), 
+                        vec![dim_0, dim_1, dim_2]
+                    );
+                }
+                Ops::Sum => now.0.storage.read().unwrap().sum_back(&mut self.prev[0].0.storage.write().unwrap()),
+                Ops::Reshape => {}
+            }
         }
     }
 }
@@ -55,7 +89,7 @@ struct RawTensor {
 // ***************          tensor          ***************
 // ********************************************************
 
-// cannot modify the tensor after it is created
+// cannot modify tensor directly after it is created
 // need Mutex or RwLock to be able to modify the tensor
 // https://github.com/huggingface/candle/blob/main/candle-core/src/tensor.rs
 #[pyclass]
@@ -159,59 +193,18 @@ impl Tensor {
 
 // TODO: handle broadcasting using storage, not a tensor
 impl Tensor {
-    fn expand_(&self, shape: &Vec<usize>) -> Tensor {
-        fn fill_data(dep: usize, in_idx: usize, in_data: &Vec<f32>, in_shape: &Vec<usize>, out_idx: usize, out_data: &mut Vec<f32>, out_shape: &Vec<usize>) {
-            if dep == in_shape.len() { out_data[out_idx] = in_data[in_idx]; return; }
-
-            for i in 0..out_shape[dep] {
-                let n_in_idx = in_idx * in_shape[dep] + i % in_shape[dep];
-                let n_out_idx = out_idx * out_shape[dep] + i;
-                fill_data(dep + 1, n_in_idx, in_data, in_shape, n_out_idx, out_data, out_shape);
-            }
-        }
-        let mut out_data = vec![0.0; shape.iter().product()];
-        fill_data(
-            0, 
-            0, 
-            self.0.storage.read().unwrap().get_data(), 
-            &self.0.shape, 
-            0, 
-            &mut out_data, 
-            &shape);
+    #[inline]
+    fn broadcast_each_(&self, shape: &Vec<usize>) -> Tensor {
+        let out_storage = self.0.storage.read().unwrap().deref().broadcast(self.0.shape.clone(), shape.clone());
 
         Tensor::new(
-            Storage::new(out_data), 
+            out_storage,
             shape.clone(), 
             self.0.requires_grad, 
         Some(Context::new(
             vec![self.clone()], 
-            Some(
-                |now, prev| {
-                    let mut prev_shape = prev[0].0.shape.clone();
-                    while prev_shape.len() < now.0.shape.len() {
-                        prev_shape.insert(0, 1);
-                    }
-
-                    fn fill_grad(dep: usize, now_idx: usize, now_grad: &Vec<f32>, now_shape: &Vec<usize>, prev_idx: usize, prev_grad: &mut Vec<f32>, prev_shape: &Vec<usize>) {
-                        if dep == now_shape.len() { prev_grad[prev_idx] += now_grad[now_idx]; return; }
-
-                        for i in 0..now_shape[dep] {
-                            let n_now_idx = now_idx * now_shape[dep] + i;
-                            let n_prev_idx = prev_idx * prev_shape[dep] + i % prev_shape[dep];
-                            fill_grad(dep + 1, n_now_idx, now_grad, now_shape, n_prev_idx, prev_grad, prev_shape);
-                        }
-                    }
-
-                    fill_grad(0, 
-                        0, 
-                        now.0.storage.read().unwrap().get_grad(), 
-                        &now.0.shape, 
-                        0, 
-                        &mut prev[0].0.storage.write().unwrap().get_grad_mut(), 
-                        &prev_shape);
-                }
-            ),
             Some(Ops::Broadcast),
+            None,
         )))
     }
     // https://numpy.org/doc/stable/user/basics.broadcasting.html
@@ -238,13 +231,13 @@ impl Tensor {
             return (self.clone(), other.clone());
         }
         else if out_shape == self_shape {
-            return (self.clone(), other.expand_(&out_shape));
+            return (self.clone(), other.broadcast_each_(&out_shape));
         }
         else if out_shape == other_shape {
-            return (self.expand_(&out_shape), other.clone());
+            return (self.broadcast_each_(&out_shape), other.clone());
         }
         else {
-            return (self.expand_(&out_shape), other.expand_(&out_shape));
+            return (self.broadcast_each_(&out_shape), other.broadcast_each_(&out_shape));
         }
     }
 }
@@ -264,17 +257,7 @@ impl Add<Tensor> for Tensor {
             c_storage, 
             a.0.shape.clone(), 
             a.0.requires_grad || b.0.requires_grad, 
-            Some(Context::new(
-                vec![a.clone(), b.clone()], 
-                Some(
-                    |now, prev| {
-                        // if prev[0] == prev[1], it causes a thread panic (calls write twice)
-                        { now.0.storage.read().unwrap().add_back(&mut prev[0].0.storage.write().unwrap()); }
-                        { now.0.storage.read().unwrap().add_back(&mut prev[1].0.storage.write().unwrap()); }
-                    }
-                ),
-                Some(Ops::Add),
-            ))
+            Some(Context::new(vec![a.clone(), b.clone()], Some(Ops::Add),None))
         )
     }
 }
@@ -295,23 +278,8 @@ impl Mul<Tensor> for Tensor {
             c_storage, 
             a.0.shape.clone(), 
             a.0.requires_grad || b.0.requires_grad, 
-            Some(Context::new(
-            vec![a.clone(), b.clone()], 
-            Some(
-                |now, prev| {
-                    // if prev[0] == prev[1], it causes a thread panic (calls write twice)
-                    {
-                        let prev_1 = prev[1].0.storage.read().unwrap().clone();
-                        now.0.storage.read().unwrap().mul_back(&mut prev[0].0.storage.write().unwrap(), &prev_1);
-                    }
-                    {
-                        let prev_0 = prev[0].0.storage.read().unwrap().clone();
-                        now.0.storage.read().unwrap().mul_back(&mut prev[1].0.storage.write().unwrap(), &prev_0);
-                    }
-                }
-            ),
-            Some(Ops::Mul),
-        )))
+            Some(Context::new(vec![a.clone(), b.clone()], Some(Ops::Mul),None))
+        )
     }
 }
 
@@ -335,35 +303,8 @@ impl Tensor {
             out_storage, 
             vec![dim_0, dim_2], 
             self.0.requires_grad || other.0.requires_grad, 
-            Some(Context::new(
-            vec![self.clone(), other.clone()], 
-            Some(
-                |now, prev| {
-                    let dim_0 = prev[0].0.shape[0];
-                    let dim_1 = prev[0].0.shape[1];
-                    let dim_2 = prev[1].0.shape[1];
-
-                    // if prev[0] == prev[1], it causes a thread panic (calls write twice)
-                    {
-                        let prev_1 = prev[1].0.storage.read().unwrap().clone();
-                        now.0.storage.read().unwrap().matmul_2d_back_0(
-                            &mut prev[0].0.storage.write().unwrap(), 
-                            &prev_1, 
-                            vec![dim_0, dim_1, dim_2]
-                        );
-                    }
-                    {
-                        let prev_0 = prev[0].0.storage.read().unwrap().clone();
-                        now.0.storage.read().unwrap().matmul_2d_back_1(
-                            &prev_0, 
-                            &mut prev[1].0.storage.write().unwrap(), 
-                            vec![dim_0, dim_1, dim_2]
-                        );
-                    }
-                }
-            ),
-            Some(Ops::Matmul),
-        )))
+            Some(Context::new(vec![self.clone(), other.clone()], Some(Ops::Matmul),None))
+        )
     }
     // https://pytorch.org/docs/stable/generated/torch.matmul.html
     fn matmul_(self, other: &Tensor) -> Tensor {
@@ -417,15 +358,7 @@ impl Tensor {
             out_storage,
             self.0.shape.clone(), 
             self.0.requires_grad, 
-            Some(Context::new(
-                vec![self.clone()], 
-                Some(
-                    |now, prev| {
-                        now.0.storage.read().unwrap().pow_back(&mut prev[0].0.storage.write().unwrap());
-                    }
-                ),
-                Some(Ops::Pow),
-            ))
+            Some(Context::new(vec![self.clone()], Some(Ops::Pow),Some(exp)))
         )
     }
     fn relu_(&self) -> Tensor {
@@ -434,15 +367,7 @@ impl Tensor {
             out_storage,
             self.0.shape.clone(), 
             self.0.requires_grad, 
-            Some(Context::new(
-                vec![self.clone()], 
-                Some(
-                    |now, prev| {
-                        now.0.storage.read().unwrap().relu_back(&mut prev[0].0.storage.write().unwrap());
-                    }
-                ),
-                Some(Ops::Relu),
-            ))
+            Some(Context::new(vec![self.clone()], Some(Ops::Relu),None))
         )
     }
 }
@@ -455,15 +380,7 @@ impl Neg for Tensor {
             out_storage,
             self.0.shape.clone(), 
             self.0.requires_grad, 
-            Some(Context::new(
-                vec![self.clone()], 
-                Some(
-                    |now, prev| {
-                        now.0.storage.read().unwrap().neg_back(&mut prev[0].0.storage.write().unwrap());
-                    }
-                ),
-                Some(Ops::Neg),
-            ))
+            Some(Context::new(vec![self.clone()], Some(Ops::Neg),None))
         )
     }
 }
@@ -480,15 +397,7 @@ impl Tensor {
             out_storage,
             vec![],
             self.0.requires_grad, 
-            Some(Context::new(
-                vec![self.clone()], 
-                Some(
-                    |now, prev| {
-                        now.0.storage.read().unwrap().sum_back(&mut prev[0].0.storage.write().unwrap());
-                    }
-                ),
-                Some(Ops::Sum),
-            ))
+            Some(Context::new(vec![self.clone()], Some(Ops::Sum), None))
         )
     }
     // https://pytorch.org/docs/stable/generated/torch.mean.html
@@ -520,11 +429,7 @@ impl Tensor {
                     id: TensorId::new(),
                     storage: self.0.storage.clone(),
                     requires_grad: self.0.requires_grad,
-                    ctx: Some(Context::new(
-                        vec![self.clone()], 
-                        Some(|_, _| { return; }),
-                        Some(Ops::Reshape),
-                    )),
+                    ctx: Some(Context::new(vec![self.clone()], Some(Ops::Reshape),None)),
                     shape: n_shape,
                 }
             )

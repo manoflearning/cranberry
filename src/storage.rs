@@ -25,7 +25,41 @@ impl Storage {
 
     pub fn get_data(&self) -> &Vec<f32> { &self.data }
     pub fn get_grad(&self) -> &Vec<f32> { &self.grad }
-    pub fn get_grad_mut(&mut self) -> &mut Vec<f32> { &mut self.grad }
+
+    // broadcasting ops
+    pub fn broadcast(&self, in_shape: Vec<usize>, out_shape: Vec<usize>) -> Storage {
+        fn fill_data(dep: usize, in_idx: usize, in_data: &Vec<f32>, in_shape: &Vec<usize>, out_idx: usize, out_data: &mut Vec<f32>, out_shape: &Vec<usize>) {
+            if dep == in_shape.len() { out_data[out_idx] = in_data[in_idx]; return; }
+
+            for i in 0..out_shape[dep] {
+                let n_in_idx = in_idx * in_shape[dep] + i % in_shape[dep];
+                let n_out_idx = out_idx * out_shape[dep] + i;
+                fill_data(dep + 1, n_in_idx, in_data, in_shape, n_out_idx, out_data, out_shape);
+            }
+        }
+
+        let mut out_data = vec![0.0; out_shape.iter().product()];
+
+        fill_data(0, 0, &self.data, &in_shape, 0, &mut out_data, &out_shape);
+
+        Self::new(out_data)
+    }
+    pub fn broadcast_back(&self, other: &mut Storage, s_shape: Vec<usize>, o_shape: Vec<usize>) {
+        let mut o_shape = o_shape;
+        while o_shape.len() < s_shape.len() { o_shape.insert(0, 1); }
+
+        fn fill_grad(dep: usize, in_idx: usize, in_grad: &mut Vec<f32>, in_shape: &Vec<usize>, out_idx: usize, out_grad: &Vec<f32>, out_shape: &Vec<usize>) {
+            if dep == out_shape.len() { in_grad[in_idx] += out_grad[out_idx]; return; }
+
+            for i in 0..out_shape[dep] {
+                let n_in_idx = in_idx * in_shape[dep] + i % in_shape[dep];
+                let n_out_idx = out_idx * out_shape[dep] + i;
+                fill_grad(dep + 1, n_in_idx, in_grad, in_shape, n_out_idx, out_grad, out_shape);
+            }
+        }
+
+        fill_grad(0, 0, &mut other.grad, &s_shape, 0, &self.grad, &o_shape);
+    }
 
     // binary ops
     pub fn add(&self, other: &Storage) -> Storage {
@@ -125,38 +159,7 @@ impl Storage {
         let data = self.data.iter().map(|a| a.powf(exp)).collect();
         Self::new(data)
     }
-    pub fn pow_back(&self, other: &mut Storage) {
-        // TODO: need to check the correctness of the formula
-        // other.data[0]^exp = self.data[0]
-        // <=> exp = log_{other.data[0]}^{self.data[0]}
-        // <=> exp = log(self.data[0]) / log(other.data[0])
-
-        // but using float division can easily cause numerical instability (e.g., nan)
-        // one idea is to use ternary search.. prolly there is a better way
-
-        // assure that exp is in [-10, 10]
-        // let mut l = -10.0;
-        // let mut r = 10.0;
-        // let eps = 1e-7; // arbitrary small number
-
-        // while r - l > eps {
-        //     let mid_0 = (2.0 * l + r) / 3.0;
-        //     let mid_1 = (l + 2.0 * r) / 3.0;
-        //     let mut max_diff_0: f32 = 0.0;
-        //     let mut max_diff_1: f32 = 0.0;
-
-        //     for i in 0..self.data.len() {
-        //         let diff_0 = (self.data[i] - other.data[i].powf(mid_0)).abs();
-        //         let diff_1 = (self.data[i] - other.data[i].powf(mid_1)).abs();
-        //         max_diff_0 = max_diff_0.max(diff_0);
-        //         max_diff_1 = max_diff_1.max(diff_1);
-        //     }
-
-        //     if max_diff_0 < max_diff_1 { r = mid_1; }
-        //     else { l = mid_0; }
-        // }
-
-        let exp = 2.0;
+    pub fn pow_back(&self, other: &mut Storage, exp: f32) {
         for (i, g) in other.grad.iter_mut().enumerate() {
             *g += self.grad[i] * exp * other.data[i].powf(exp - 1.0);
         }

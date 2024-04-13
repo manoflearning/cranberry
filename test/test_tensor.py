@@ -9,6 +9,7 @@ A_np = np.random.randn(5, 5).astype(np.float32)
 B_np = np.random.randn(5, 5).astype(np.float32)
 C_np = np.random.randn(5, 5).astype(np.float32)
 
+# for broadcasting
 Z_np = np.random.randn(1, 1).astype(np.float32)
 
 class TestCranberry(unittest.TestCase):
@@ -35,8 +36,179 @@ class TestCranberry(unittest.TestCase):
         B = cr.Tensor(B_np)
         np.testing.assert_allclose(A_np @ B_np, (A @ B).numpy(), rtol=1e-7, atol=1e-7)
 
-    def test_backward_pass_1(self):
-        def run_cranberry():
+    def test_broadcast_backward(self):
+        def test_cranberry():
+            A = cr.Tensor(A_np, requires_grad=True)
+            Z = cr.Tensor(Z_np, requires_grad=True)
+            out = A + Z
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, Z.grad
+        
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            Z = torch.tensor(Z_np, requires_grad=True)
+            out = A + Z
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, Z.grad
+
+        for (x, y) in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+    
+    def test_pow_backward(self):
+        def test_cranberry():
+            A = cr.Tensor(A_np, requires_grad=True)
+            out = A.pow(3.14)
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            out = A.pow(3.14)
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+
+        for (x, y) in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+
+    def test_relu_backward(self):
+        def test_cranberry():
+            A = cr.Tensor(A_np, requires_grad=True)
+            out = A.relu()
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            out = A.relu()
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+
+        for (x, y) in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+    
+    def test_neg_backward(self):
+        def test_cranberry():
+            A = cr.Tensor(A_np, requires_grad=True)
+            out = -A
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            out = -A
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+
+        for (x, y) in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+    
+    def test_add_backward(self):
+        def test_cranberry():
+            A = cr.Tensor(A_np, requires_grad=True)
+            B = cr.Tensor(B_np, requires_grad=True)
+            out = A + B
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, B.grad
+        
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            B = torch.tensor(B_np, requires_grad=True)
+            out = A + B
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, B.grad
+
+        for (x, y) in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+    
+    def test_mul_backward(self):
+        def test_cranberry():
+            A = cr.Tensor(A_np, requires_grad=True)
+            B = cr.Tensor(B_np, requires_grad=True)
+            out = A * B
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, B.grad
+        
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            B = torch.tensor(B_np, requires_grad=True)
+            out = A * B
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, B.grad
+
+        for (x, y) in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+    
+    def test_matmul_backward(self):
+        def test_cranberry():
+            A = cr.Tensor(A_np, requires_grad=True)
+            B = cr.Tensor(B_np, requires_grad=True)
+            out = A @ B
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, B.grad
+        
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            B = torch.tensor(B_np, requires_grad=True)
+            out = A @ B
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, B.grad
+
+        for (x, y) in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+    
+    def test_sum_backward(self):
+        def test_cranberry():
+            A = cr.Tensor(A_np, requires_grad=True)
+            out = A.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            out = A.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+
+        for (x, y) in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+    
+    # reshape op doesn't do actual backprop
+    # but it shares the same storage as the original tensor
+    # so it should works
+    def test_reshape_backward(self):
+        def test_cranberry():
+            A = cr.Tensor(A_np, requires_grad=True)
+            out = A.reshape([1, 25])
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            out = A.reshape([1, 25])
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+
+        for (x, y) in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol=1e-7, atol=1e-7)
+
+    def test_backward_pass_0(self):
+        def test_cranberry():
             A = cr.Tensor(A_np, requires_grad=True)
             B = cr.Tensor(B_np, requires_grad=True)
             C = cr.Tensor(C_np)
@@ -50,7 +222,7 @@ class TestCranberry(unittest.TestCase):
             out.backward()
             return out.detach().numpy(), A.grad, B.grad
         
-        def run_pytorch():
+        def test_pytorch():
             A = torch.tensor(A_np, requires_grad=True)
             B = torch.tensor(B_np, requires_grad=True)
             C = torch.tensor(C_np)
@@ -64,11 +236,11 @@ class TestCranberry(unittest.TestCase):
             out.backward()
             return out.detach().numpy(), A.grad, B.grad
 
-        for x, y in zip(run_cranberry(), run_pytorch()):
+        for x, y in zip(test_cranberry(), test_pytorch()):
             np.testing.assert_allclose(x, y, rtol=1e-5, atol=1e-5)
 
-    def test_backward_pass_2(self):
-        def run_cranberry():
+    def test_backward_pass_1(self):
+        def test_cranberry():
             x = cr.Tensor(-4.0, requires_grad=True)
             z = cr.Tensor(2.0) * x + cr.Tensor(2.0) + x
             q = z.relu() + z * x
@@ -77,7 +249,7 @@ class TestCranberry(unittest.TestCase):
             y.backward()
             return y.detach().numpy(), x.grad
 
-        def run_pytorch():
+        def test_pytorch():
             x = torch.tensor(-4.0, requires_grad=True, dtype=torch.float32)
             z = 2.0 * x + 2.0 + x
             q = z.relu() + z * x
@@ -86,7 +258,7 @@ class TestCranberry(unittest.TestCase):
             y.backward()
             return y.detach().numpy(), x.grad
         
-        for x, y in zip(run_cranberry(), run_pytorch()):
+        for x, y in zip(test_cranberry(), test_pytorch()):
             np.testing.assert_allclose(x, y, rtol=1e-5, atol=1e-5)
 
 if __name__ == '__main__':
