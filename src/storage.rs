@@ -58,7 +58,7 @@ impl Storage {
             }
         }
 
-        fill_grad(0, 0, &mut other.grad, &s_shape, 0, &self.grad, &o_shape);
+        fill_grad(0, 0, &mut other.grad, &o_shape, 0, &self.grad, &s_shape);
     }
 
     // binary ops
