@@ -1,14 +1,14 @@
 import math
-import cranberry as cb
+import cranberry as cr
 
 class Linear:
     # https://github.com/tinygrad/tinygrad/blob/master/tinygrad/nn/__init__.py#L72-L80
     def __init__(self, in_features: int, out_features: int, bias=True):
-        self.weight = cb.Tensor.kaiming_uniform(shape=[in_features, out_features], a=math.sqrt(5))
-        bound = 1 / math.sqrt(in_features)
-        self.bias = cb.Tensor.uniform(shape=[out_features], low=-bound, high=bound) if bias else None
+        self.weight = cr.Tensor.uniform(shape=[in_features, out_features], low=-1, high=1)
+        # bound = 1 / math.sqrt(in_features)
+        self.bias = cr.Tensor.uniform(shape=[out_features], low=-1, high=1) if bias else None
 
-    def __call__(self, x: cb.Tensor) -> cb.Tensor:
+    def __call__(self, x: cr.Tensor) -> cr.Tensor:
         return x.linear(weight=self.weight, bias=self.bias)
 
     def __str__(self):
@@ -18,7 +18,7 @@ class Linear:
         return [self.weight, self.bias] if self.bias is not None else [self.weight]
 
 class ReLU:
-    def __call__(self, x: cb.Tensor) -> cb.Tensor:
+    def __call__(self, x: cr.Tensor) -> cr.Tensor:
         return x.relu()
     
     def parameters(self):
