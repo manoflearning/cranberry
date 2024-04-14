@@ -28,8 +28,11 @@ impl Storage {
 
     // broadcasting ops
     pub fn broadcast(&self, in_shape: Vec<usize>, out_shape: Vec<usize>) -> Storage {
+        let mut in_shape = in_shape;
+        while in_shape.len() < out_shape.len() { in_shape.insert(0, 1); }
+
         fn fill_data(dep: usize, in_idx: usize, in_data: &Vec<f32>, in_shape: &Vec<usize>, out_idx: usize, out_data: &mut Vec<f32>, out_shape: &Vec<usize>) {
-            if dep == in_shape.len() { out_data[out_idx] = in_data[in_idx]; return; }
+            if dep == out_shape.len() { out_data[out_idx] = in_data[in_idx]; return; }
 
             for i in 0..out_shape[dep] {
                 let n_in_idx = in_idx * in_shape[dep] + i % in_shape[dep];

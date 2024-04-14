@@ -58,8 +58,8 @@ impl Context {
                 Ops::Pow => now.0.storage.read().unwrap().pow_back(&mut self.prev[0].0.storage.write().unwrap(), self.op_ctx.unwrap()),
                 Ops::Relu => now.0.storage.read().unwrap().relu_back(&mut self.prev[0].0.storage.write().unwrap()),
                 Ops::Exp => now.0.storage.read().unwrap().exp_back(&mut self.prev[0].0.storage.write().unwrap()),
-                Ops::Neg => now.0.storage.read().unwrap().neg_back(&mut self.prev[0].0.storage.write().unwrap()),
                 Ops::Log => now.0.storage.read().unwrap().log_back(&mut self.prev[0].0.storage.write().unwrap()),
+                Ops::Neg => now.0.storage.read().unwrap().neg_back(&mut self.prev[0].0.storage.write().unwrap()),
                 Ops::Sum => now.0.storage.read().unwrap().sum_back(&mut self.prev[0].0.storage.write().unwrap()),
                 Ops::Reshape => {}
             }
@@ -211,31 +211,31 @@ impl Tensor {
     }
     // https://numpy.org/doc/stable/user/basics.broadcasting.html
     fn broadcast_(&self, other: &Tensor) -> (Tensor, Tensor) {
-        let mut self_shape = self.0.shape.clone();
-        let mut other_shape = other.0.shape.clone();
+        let mut s_shape = self.0.shape.clone();
+        let mut o_shape = other.0.shape.clone();
 
-        while self_shape.len() < other_shape.len() {
-            self_shape.insert(0, 1);
+        while s_shape.len() < o_shape.len() {
+            s_shape.insert(0, 1);
         }
-        while other_shape.len() < self_shape.len() {
-            other_shape.insert(0, 1);
+        while o_shape.len() < s_shape.len() {
+            o_shape.insert(0, 1);
         }
 
         let mut out_shape: Vec<usize> = vec![];
-        for (s, o) in self_shape.iter().zip(other_shape.iter()) {
+        for (s, o) in s_shape.iter().zip(o_shape.iter()) {
             if s == o { out_shape.push(*s); }
             else if *s == 1 { out_shape.push(*o); }
             else if *o == 1 { out_shape.push(*s); }
             else { panic!("Tensor dimensions must match"); }
         }
 
-        if out_shape == self_shape && out_shape == other_shape {
+        if out_shape == self.0.shape && out_shape == other.0.shape {
             return (self.clone(), other.clone());
         }
-        else if out_shape == self_shape {
+        else if out_shape == self.0.shape {
             return (self.clone(), other.broadcast_each_(&out_shape));
         }
-        else if out_shape == other_shape {
+        else if out_shape == other.0.shape {
             return (self.broadcast_each_(&out_shape), other.clone());
         }
         else {
@@ -382,8 +382,8 @@ impl Tensor {
         )
     }
     fn sigmoid_(&self) -> Tensor {
-        let unit = Tensor::new(Storage::new(vec![1.0]),vec![],false,None);
-        unit.clone() / (unit.clone() + (-self.clone()).exp_())
+        let one = Tensor::new(Storage::new(vec![1.0]), vec![], false, None);
+        one.clone() / (one.clone() + (-self.clone()).exp_())
     }
     // https://pytorch.org/docs/stable/generated/torch.log.html
     fn log_(&self) -> Tensor {
