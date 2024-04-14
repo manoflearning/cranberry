@@ -16,10 +16,3 @@ class Linear:
 
     def parameters(self):
         return [self.weight, self.bias] if self.bias is not None else [self.weight]
-
-class ReLU:
-    def __call__(self, x: Tensor) -> Tensor:
-        return x.relu()
-    
-    def parameters(self):
-        return []
