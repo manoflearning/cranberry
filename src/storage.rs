@@ -173,6 +173,24 @@ impl Storage {
             *g += self.grad[i] * if self.data[i] > 0.0 { 1.0 } else { 0.0 };
         }
     }
+    pub fn exp(&self) -> Storage {
+        let data = self.data.iter().map(|a| a.exp()).collect();
+        Self::new(data)
+    }
+    pub fn exp_back(&self, other: &mut Storage) {
+        for (i, g) in other.grad.iter_mut().enumerate() {
+            *g += self.grad[i] * self.data[i];
+        }
+    }
+    pub fn log(&self) -> Storage {
+        let data = self.data.iter().map(|a| a.ln()).collect();
+        Self::new(data)
+    }
+    pub fn log_back(&self, other: &mut Storage) {
+        for (i, g) in other.grad.iter_mut().enumerate() {
+            *g += self.grad[i] / other.data[i];
+        }
+    }
     pub fn neg(&self) -> Storage {
         let data = self.data.iter().map(|a| -a).collect();
         Self::new(data)

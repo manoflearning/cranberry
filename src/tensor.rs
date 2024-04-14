@@ -28,9 +28,6 @@ impl Context {
         if let Some(op) = self.op {
             match op {
                 Ops::Broadcast => now.0.storage.read().unwrap().broadcast_back(&mut self.prev[0].0.storage.write().unwrap(), now.0.shape.clone(), self.prev[0].0.shape.clone()),
-                Ops::Pow => now.0.storage.read().unwrap().pow_back(&mut self.prev[0].0.storage.write().unwrap(), self.op_ctx.unwrap()),
-                Ops::Relu => now.0.storage.read().unwrap().relu_back(&mut self.prev[0].0.storage.write().unwrap()),
-                Ops::Neg => now.0.storage.read().unwrap().neg_back(&mut self.prev[0].0.storage.write().unwrap()),
                 Ops::Add => self.prev.iter().for_each(|p| now.0.storage.read().unwrap().add_back(&mut p.0.storage.write().unwrap())),
                 Ops::Mul => {
                     // to avoid the thread panic when prev[0] == prev[1]
@@ -58,6 +55,11 @@ impl Context {
                         vec![dim_0, dim_1, dim_2]
                     );
                 }
+                Ops::Pow => now.0.storage.read().unwrap().pow_back(&mut self.prev[0].0.storage.write().unwrap(), self.op_ctx.unwrap()),
+                Ops::Relu => now.0.storage.read().unwrap().relu_back(&mut self.prev[0].0.storage.write().unwrap()),
+                Ops::Exp => now.0.storage.read().unwrap().exp_back(&mut self.prev[0].0.storage.write().unwrap()),
+                Ops::Neg => now.0.storage.read().unwrap().neg_back(&mut self.prev[0].0.storage.write().unwrap()),
+                Ops::Log => now.0.storage.read().unwrap().log_back(&mut self.prev[0].0.storage.write().unwrap()),
                 Ops::Sum => now.0.storage.read().unwrap().sum_back(&mut self.prev[0].0.storage.write().unwrap()),
                 Ops::Reshape => {}
             }
@@ -370,6 +372,29 @@ impl Tensor {
             Some(Context::new(vec![self.clone()], Some(Ops::Relu),None))
         )
     }
+    fn exp_(&self) -> Tensor {
+        let out_storage = self.0.storage.read().unwrap().deref().exp();
+        Tensor::new(
+            out_storage,
+            self.0.shape.clone(),
+            self.0.requires_grad,
+            Some(Context::new(vec![self.clone()], Some(Ops::Exp), None))
+        )
+    }
+    fn sigmoid_(&self) -> Tensor {
+        let unit = Tensor::new(Storage::new(vec![1.0]),vec![],false,None);
+        unit.clone() / (unit.clone() + (-self.clone()).exp_())
+    }
+    // https://pytorch.org/docs/stable/generated/torch.log.html
+    fn log_(&self) -> Tensor {
+        let out_storage = self.0.storage.read().unwrap().deref().log();
+        Tensor::new(
+            out_storage,
+            self.0.shape.clone(),
+            self.0.requires_grad,
+            Some(Context::new(vec![self.clone()], Some(Ops::Log), None))
+        )
+    }
 }
 
 impl Neg for Tensor {
@@ -573,6 +598,9 @@ impl Tensor {
     // unary ops
     fn pow(&self, exp: f32) -> PyResult<Tensor> { Ok(self.pow_(exp)) }
     fn relu(&self) -> PyResult<Tensor> { Ok(self.relu_()) }
+    fn exp(&self) -> PyResult<Tensor> { Ok(self.exp_()) }
+    fn sigmoid(&self) -> PyResult<Tensor> { Ok(self.sigmoid_()) }
+    fn log(&self) -> PyResult<Tensor> { Ok(self.log_()) }
     fn __neg__(&self) -> PyResult<Tensor> { Ok(-self.clone()) }
 
     // reduce ops
