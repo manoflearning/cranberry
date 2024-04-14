@@ -13,7 +13,7 @@ use tensor::Tensor;
 
 #[pymodule]
 fn cranberry(_py: Python, m: &PyModule) -> PyResult<()> {
-    assert!(set_current_thread_priority(ThreadPriority::Min).is_ok());
+    assert!(set_current_thread_priority(ThreadPriority::Min).is_ok()); // is this really working?
     m.add_class::<Tensor>()?;
     Ok(())
 }
