@@ -540,6 +540,9 @@ impl Tensor {
     #[staticmethod] 
     fn kaiming_uniform(shape: Vec<usize>, a: f32, seed: Option<u64>) -> PyResult<Tensor> { Ok(Tensor::kaiming_uniform_(shape, a, seed)) }
     
+    fn zero_grad(&self) -> PyResult<()> { Ok(self.zero_grad_()) }
+    fn step(&self, lr: f32) -> PyResult<()> { Ok(self.step_(lr)) }
+
     fn detach(&self) -> PyResult<Tensor> { Ok(self.detach_()) }
 
     fn __eq__(&self, other: &Tensor) -> PyResult<bool> { Ok(self == other) }
