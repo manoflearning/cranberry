@@ -498,6 +498,14 @@ impl Tensor {
     }
     // https://pytorch.org/docs/stable/generated/torch.transpose.html
     fn transpose_(&self, _dim0: usize, _dim1: usize) -> Tensor { unimplemented!(); }
+    fn flatten_(&self, start_dim: usize) -> Tensor {
+        let mut n_shape = vec![];
+        for (i, x) in self.0.shape.iter().enumerate() {
+            if i <= start_dim { n_shape.push(*x); }
+            else { n_shape[start_dim] = n_shape[start_dim] * x; }
+        }
+        self.reshape_(n_shape)
+    }
 }
 
 // ********************************************************
@@ -672,6 +680,7 @@ impl Tensor {
     // movement ops
     fn reshape(&self, shape: Vec<usize>) -> PyResult<Tensor> {  Ok(self.reshape_(shape)) }
     fn transpose(&self, dim0: usize, dim1: usize) -> PyResult<Tensor> { Ok(self.transpose_(dim0, dim1)) }
+    fn flatten(&self, start_dim: usize) -> PyResult<Tensor> { Ok(self.flatten_(start_dim)) }
 
     // functional nn ops
     fn linear(&self, weight: &Tensor, bias: Option<&Tensor>) -> PyResult<Tensor> { Ok(self.linear_(weight, bias)) }
