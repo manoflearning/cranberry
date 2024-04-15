@@ -111,6 +111,15 @@ impl Tensor {
         ))
     }
 
+    fn zeros_(shape: Vec<usize>) -> Tensor {
+        let out_data = vec![0.0; shape.iter().product()];
+        Tensor::new(Storage::new(out_data), shape, false, None)
+    }
+    fn ones_(shape: Vec<usize>) -> Tensor {
+        let out_data = vec![1.0; shape.iter().product()];
+        Tensor::new(Storage::new(out_data), shape, false, None)
+    }
+
     // TODO: if seed exists, using seed
     fn uniform_(shape: Vec<usize>, low: f32, high: f32, _seed: Option<u64>) -> Tensor {
         let data: Vec<f32> = (0..shape.iter().product()).map(|_| rand::random::<f32>() * (high - low) + low).collect();
@@ -385,6 +394,37 @@ impl Tensor {
         let one = Tensor::new(Storage::new(vec![1.0]), vec![], false, None);
         one.clone() / (one.clone() + (-self.clone()).exp_())
     }
+    fn softmax_(&self, dim: usize) -> Tensor {
+        let self_exp = self.clone().exp_();
+
+        let mut num_data: Vec<f32> = vec![0.0; self.len_() / self.0.shape[dim]];
+        let mut num_shape = self.0.shape.clone();
+        num_shape[dim] = 1;
+
+        fn fill_num(num_idx: usize, num_data: &mut Vec<f32>, num_shape: &Vec<usize>, idx: usize, data: &Vec<f32>, shape: &Vec<usize>, dep: usize) {
+            if dep == shape.len() {
+                num_data[num_idx] += data[idx];
+                return;
+            }
+
+            for i in 0..shape[dep] {
+                let n_num_idx = num_idx * num_shape[dep] + i % num_shape[dep];
+                let n_idx = idx * shape[dep] + i;
+                fill_num(n_num_idx, num_data, num_shape, n_idx, data, shape, dep + 1);
+            }
+        }
+
+        fill_num(0, &mut num_data, &num_shape, 0, self_exp.0.storage.read().unwrap().get_data(), &self.0.shape, 0);
+
+        let num = Tensor::new(
+            Storage::new(num_data),
+            num_shape,
+            false,
+            None,
+        );
+
+        self_exp / num
+    }
     // https://pytorch.org/docs/stable/generated/torch.log.html
     fn log_(&self) -> Tensor {
         let out_storage = self.0.storage.read().unwrap().deref().log();
@@ -460,7 +500,6 @@ impl Tensor {
             )
         }
     }
-
     // https://pytorch.org/docs/stable/generated/torch.transpose.html
     fn transpose_(&self, dim0: usize, dim1: usize) -> Tensor {
         unimplemented!();
@@ -536,6 +575,11 @@ impl Tensor {
     }
 
     #[staticmethod]
+    fn zeros(shape: Vec<usize>) -> PyResult<Tensor> { Ok(Tensor::zeros_(shape)) }
+    #[staticmethod]
+    fn ones(shape: Vec<usize>) -> PyResult<Tensor> { Ok(Tensor::ones_(shape)) }
+
+    #[staticmethod]
     fn uniform(shape: Vec<usize>, low: f32, high: f32, seed: Option<u64>) -> PyResult<Tensor> { Ok(Tensor::uniform_(shape, low, high, seed)) }
     #[staticmethod] 
     fn kaiming_uniform(shape: Vec<usize>, a: f32, seed: Option<u64>) -> PyResult<Tensor> { Ok(Tensor::kaiming_uniform_(shape, a, seed)) }
@@ -603,12 +647,14 @@ impl Tensor {
     fn relu(&self) -> PyResult<Tensor> { Ok(self.relu_()) }
     fn exp(&self) -> PyResult<Tensor> { Ok(self.exp_()) }
     fn sigmoid(&self) -> PyResult<Tensor> { Ok(self.sigmoid_()) }
+    fn softmax(&self, dim: Option<usize>) -> PyResult<Tensor> { Ok(self.softmax_(dim.unwrap_or(0))) } // TODO: default dim=0, but is it correct?
     fn log(&self) -> PyResult<Tensor> { Ok(self.log_()) }
     fn __neg__(&self) -> PyResult<Tensor> { Ok(-self.clone()) }
 
     // reduce ops
     fn sum(&self) -> PyResult<Tensor> { Ok(self.sum_()) }
     fn mean(&self) -> PyResult<Tensor> { Ok(self.mean_()) }
+    fn crossentropy(&self, other: &Tensor) -> PyResult<Tensor> { unimplemented!() }
 
     // movement ops
     fn reshape(&self, shape: Vec<usize>) -> PyResult<Tensor> {  Ok(self.reshape_(shape)) }
