@@ -18,11 +18,7 @@ struct Context {
 
 impl Context {
     fn new(prev: Vec<Tensor>, op: Option<Ops>, op_ctx: Option<f32>) -> Self {
-        Self {
-            prev,
-            op,
-            op_ctx,
-        }
+        Self { prev, op, op_ctx, }
     }
     fn walk(&self, now: &Tensor) { 
         if let Some(op) = self.op {
@@ -394,37 +390,6 @@ impl Tensor {
         let one = Tensor::new(Storage::new(vec![1.0]), vec![], false, None);
         one.clone() / (one.clone() + (-self.clone()).exp_())
     }
-    fn softmax_(&self, dim: usize) -> Tensor {
-        let self_exp = self.clone().exp_();
-
-        let mut num_data: Vec<f32> = vec![0.0; self.len_() / self.0.shape[dim]];
-        let mut num_shape = self.0.shape.clone();
-        num_shape[dim] = 1;
-
-        fn fill_num(num_idx: usize, num_data: &mut Vec<f32>, num_shape: &Vec<usize>, idx: usize, data: &Vec<f32>, shape: &Vec<usize>, dep: usize) {
-            if dep == shape.len() {
-                num_data[num_idx] += data[idx];
-                return;
-            }
-
-            for i in 0..shape[dep] {
-                let n_num_idx = num_idx * num_shape[dep] + i % num_shape[dep];
-                let n_idx = idx * shape[dep] + i;
-                fill_num(n_num_idx, num_data, num_shape, n_idx, data, shape, dep + 1);
-            }
-        }
-
-        fill_num(0, &mut num_data, &num_shape, 0, self_exp.0.storage.read().unwrap().get_data(), &self.0.shape, 0);
-
-        let num = Tensor::new(
-            Storage::new(num_data),
-            num_shape,
-            false,
-            None,
-        );
-
-        self_exp / num
-    }
     // https://pytorch.org/docs/stable/generated/torch.log.html
     fn log_(&self) -> Tensor {
         let out_storage = self.0.storage.read().unwrap().deref().log();
@@ -475,6 +440,37 @@ impl Tensor {
         );
         self.sum_() / num
     }
+    fn softmax_(&self, dim: usize) -> Tensor {
+        let self_exp = self.clone().exp_();
+
+        let mut num_data: Vec<f32> = vec![0.0; self.len_() / self.0.shape[dim]];
+        let mut num_shape = self.0.shape.clone();
+        num_shape[dim] = 1;
+
+        fn fill_num(num_idx: usize, num_data: &mut Vec<f32>, num_shape: &Vec<usize>, idx: usize, data: &Vec<f32>, shape: &Vec<usize>, dep: usize) {
+            if dep == shape.len() {
+                num_data[num_idx] += data[idx];
+                return;
+            }
+
+            for i in 0..shape[dep] {
+                let n_num_idx = num_idx * num_shape[dep] + i % num_shape[dep];
+                let n_idx = idx * shape[dep] + i;
+                fill_num(n_num_idx, num_data, num_shape, n_idx, data, shape, dep + 1);
+            }
+        }
+
+        fill_num(0, &mut num_data, &num_shape, 0, self_exp.0.storage.read().unwrap().get_data(), &self.0.shape, 0);
+
+        let num = Tensor::new(
+            Storage::new(num_data),
+            num_shape,
+            false,
+            None,
+        );
+
+        self_exp / num
+    }
 }
 
 // ********************************************************
@@ -501,16 +497,7 @@ impl Tensor {
         }
     }
     // https://pytorch.org/docs/stable/generated/torch.transpose.html
-    fn transpose_(&self, dim0: usize, dim1: usize) -> Tensor {
-        unimplemented!();
-
-        assert!(dim0 < self.0.shape.len() && dim1 < self.0.shape.len(), "dimension out of range");
-
-        let mut n_shape = self.0.shape.clone();
-        n_shape.swap(dim0, dim1);
-
-        self.reshape_(n_shape)
-    }
+    fn transpose_(&self, _dim0: usize, _dim1: usize) -> Tensor { unimplemented!(); }
 }
 
 // ********************************************************
@@ -522,6 +509,33 @@ impl Tensor {
         let mut out = self.clone().matmul_(&weight);
         if let Some(bias) = bias { out = out + bias.clone(); }
         out
+    }
+    fn sparse_categorical_crossentropy_(&self, y: &Tensor) -> Tensor {
+        assert!(self.0.shape.len() == 2, "only support 2d tensor");
+        assert!(y.0.shape.len() == 1, "only support 1d tensor");
+
+        let ypred = self.softmax_(1);
+
+        let y_data = y.0.storage.read().unwrap().get_data().clone();
+        let mut yonehot_data = vec![0.0; ypred.len_()];
+        for i in 0..ypred.0.shape[0] {
+            for j in 0..ypred.0.shape[1] {
+                if j == (y_data[i] + 0.001) as usize {
+                    yonehot_data[i * ypred.0.shape[1] + j] = 1.0;
+                }
+                else { yonehot_data[i * ypred.0.shape[1] + j] = 0.0; }
+            }
+        }
+
+        let yonehot = Tensor::new(
+            Storage::new(yonehot_data),
+            ypred.0.shape.clone(),
+            false,
+            None,
+        );
+
+        let one = Tensor::ones_(vec![1]);
+        return -(yonehot.clone() * ypred.clone().log_() + (one.clone()- yonehot.clone()) * (one.clone() - ypred.clone()).log_()).mean_()
     }
 }
 
@@ -647,14 +661,13 @@ impl Tensor {
     fn relu(&self) -> PyResult<Tensor> { Ok(self.relu_()) }
     fn exp(&self) -> PyResult<Tensor> { Ok(self.exp_()) }
     fn sigmoid(&self) -> PyResult<Tensor> { Ok(self.sigmoid_()) }
-    fn softmax(&self, dim: Option<usize>) -> PyResult<Tensor> { Ok(self.softmax_(dim.unwrap_or(0))) } // TODO: default dim=0, but is it correct?
     fn log(&self) -> PyResult<Tensor> { Ok(self.log_()) }
     fn __neg__(&self) -> PyResult<Tensor> { Ok(-self.clone()) }
 
     // reduce ops
     fn sum(&self) -> PyResult<Tensor> { Ok(self.sum_()) }
     fn mean(&self) -> PyResult<Tensor> { Ok(self.mean_()) }
-    fn crossentropy(&self, other: &Tensor) -> PyResult<Tensor> { unimplemented!() }
+    fn softmax(&self, dim: Option<usize>) -> PyResult<Tensor> { Ok(self.softmax_(dim.unwrap_or(1))) } // TODO: default dim=1, but is it correct?
 
     // movement ops
     fn reshape(&self, shape: Vec<usize>) -> PyResult<Tensor> {  Ok(self.reshape_(shape)) }
@@ -662,4 +675,5 @@ impl Tensor {
 
     // functional nn ops
     fn linear(&self, weight: &Tensor, bias: Option<&Tensor>) -> PyResult<Tensor> { Ok(self.linear_(weight, bias)) }
+    fn sparse_categorical_crossentropy(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.sparse_categorical_crossentropy_(other)) }
 }
