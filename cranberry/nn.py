@@ -1,8 +1,10 @@
 import math
 from cranberry import Tensor
+from typing import List, Callable
 
 class Linear:
     # https://github.com/tinygrad/tinygrad/blob/master/tinygrad/nn/__init__.py#L72-L80
+    # TODO: implement more detailed Linear
     def __init__(self, in_features: int, out_features: int, bias=True):
         self.weight = Tensor.uniform(shape=[in_features, out_features], low=-1, high=1)
         # bound = 1 / math.sqrt(in_features)
@@ -16,3 +18,19 @@ class Linear:
 
     def parameters(self):
         return [self.weight, self.bias] if self.bias is not None else [self.weight]
+    
+
+class Sequential:
+    def __init__(self, *layers):
+        self.layers: List[Callable[[Tensor], Tensor]] = layers
+
+    def __call__(self, x: Tensor) -> Tensor:
+        for layer in self.layers: x = layer(x)
+        return x
+    
+    def parameters(self):
+        out = []
+        for layer in self.layers:
+            if hasattr(layer, "parameters"):
+                out += layer.parameters()
+        return out
