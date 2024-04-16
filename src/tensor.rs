@@ -50,11 +50,11 @@ impl Context {
                         vec![dim_0, dim_1, dim_2]
                     );
                 }
+                Ops::Neg => now.0.storage.read().unwrap().neg_back(&mut self.prev[0].0.storage.write().unwrap()),
                 Ops::Pow => now.0.storage.read().unwrap().pow_back(&mut self.prev[0].0.storage.write().unwrap(), self.op_ctx.unwrap()),
                 Ops::Relu => now.0.storage.read().unwrap().relu_back(&mut self.prev[0].0.storage.write().unwrap()),
                 Ops::Exp => now.0.storage.read().unwrap().exp_back(&mut self.prev[0].0.storage.write().unwrap()),
                 Ops::Log => now.0.storage.read().unwrap().log_back(&mut self.prev[0].0.storage.write().unwrap()),
-                Ops::Neg => now.0.storage.read().unwrap().neg_back(&mut self.prev[0].0.storage.write().unwrap()),
                 Ops::Sum => now.0.storage.read().unwrap().sum_back(&mut self.prev[0].0.storage.write().unwrap()),
                 Ops::Reshape => {}
             }
@@ -284,6 +284,19 @@ impl Tensor {
 // ***************         unary ops        ***************
 // ********************************************************
 
+impl Neg for Tensor {
+    type Output = Tensor;
+    fn neg(self) -> Self::Output {
+        let out_storage = self.0.storage.read().unwrap().deref().neg();
+        Tensor::new(
+            out_storage,
+            self.0.shape.clone(), 
+            self.0.requires_grad, 
+            Some(Context::new(vec![self.clone()], Some(Ops::Neg),None))
+        )
+    }
+}
+
 impl Tensor {
     fn pow_(&self, exp: f32) -> Tensor {
         let out_storage = self.0.storage.read().unwrap().deref().pow(exp);
@@ -312,10 +325,7 @@ impl Tensor {
             Some(Context::new(vec![self.clone()], Some(Ops::Exp), None))
         )
     }
-    fn sigmoid_(&self) -> Tensor {
-        let one = Tensor::new(Storage::new(vec![1.0]), vec![], false, None);
-        one.clone() / (one.clone() + (-self.clone()).exp_())
-    }
+    fn sigmoid_(&self) -> Tensor { Tensor::scalar_(1.0) / (Tensor::scalar_(1.0) + (-self.clone()).exp_()) }
     fn log_(&self) -> Tensor {
         // https://pytorch.org/docs/stable/generated/torch.log.html
         let out_storage = self.0.storage.read().unwrap().deref().log();
@@ -344,19 +354,6 @@ impl Tensor {
         fill_num(0, &mut num_data, &num_shape, 0, self_exp.0.storage.read().unwrap().get_data(), &self_exp.0.shape, 0);
 
         self_exp / Tensor::new(Storage::new(num_data), num_shape, false, None)
-    }
-}
-
-impl Neg for Tensor {
-    type Output = Tensor;
-    fn neg(self) -> Self::Output {
-        let out_storage = self.0.storage.read().unwrap().deref().neg();
-        Tensor::new(
-            out_storage,
-            self.0.shape.clone(), 
-            self.0.requires_grad, 
-            Some(Context::new(vec![self.clone()], Some(Ops::Neg),None))
-        )
     }
 }
 
@@ -530,44 +527,44 @@ impl Tensor {
     fn backward(&self) -> PyResult<()> { Ok(self.backward_()) }
 
     // binary ops
-    fn add(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() + b.clone()) }
-    fn __add__(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() + b.clone()) }
-    fn __radd__(&self, other: &PyAny) -> PyResult<Tensor> { self.add(other) }
-    fn sub(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() - b.clone()) }
-    fn __sub__(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() - b.clone()) }
-    fn __rsub__(&self, other: &PyAny) -> PyResult<Tensor> { self.sub(other) }
-    fn mul(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() * b.clone()) }
-    fn __mul__(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() * b.clone()) }
-    fn __rmul__(&self, other: &PyAny) -> PyResult<Tensor> { self.mul(other) }
-    fn div(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() / b.clone()) }
-    fn __truediv__(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() / b.clone()) }
-    fn __rtruediv__(&self, other: &PyAny) -> PyResult<Tensor> { self.div(other) }
+    fn add(&self, other: &PyAny)            -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() + b.clone()) }
+    fn sub(&self, other: &PyAny)            -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() - b.clone()) }
+    fn mul(&self, other: &PyAny)            -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() * b.clone()) }
+    fn div(&self, other: &PyAny)            -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() / b.clone()) }
+    fn __add__(&self, other: &PyAny)        -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() + b.clone()) }
+    fn __sub__(&self, other: &PyAny)        -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() - b.clone()) }
+    fn __mul__(&self, other: &PyAny)        -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() * b.clone()) }
+    fn __truediv__(&self, other: &PyAny)    -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() / b.clone()) }
+    fn __radd__(&self, other: &PyAny)       -> PyResult<Tensor> { operate(self, other, |a, b| b.clone() + a.clone()) }
+    fn __rsub__(&self, other: &PyAny)       -> PyResult<Tensor> { operate(self, other, |a, b| b.clone() - a.clone()) }
+    fn __rmul__(&self, other: &PyAny)       -> PyResult<Tensor> { operate(self, other, |a, b| b.clone() * a.clone()) }
+    fn __rtruediv__(&self, other: &PyAny)   -> PyResult<Tensor> { operate(self, other, |a, b| b.clone() / a.clone()) }
 
-    fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
-    fn matmul(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
-    fn dot(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
+    fn __matmul__(&self, other: &Tensor)    -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
+    fn matmul(&self, other: &Tensor)        -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
+    fn dot(&self, other: &Tensor)           -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
 
     // unary ops
-    fn pow(&self, exp: f32) -> PyResult<Tensor> { Ok(self.pow_(exp)) }
-    fn relu(&self) -> PyResult<Tensor> { Ok(self.relu_()) }
-    fn exp(&self) -> PyResult<Tensor> { Ok(self.exp_()) }
-    fn sigmoid(&self) -> PyResult<Tensor> { Ok(self.sigmoid_()) }
-    fn log(&self) -> PyResult<Tensor> { Ok(self.log_()) }
-    fn softmax(&self, dim: Option<usize>) -> PyResult<Tensor> { Ok(self.softmax_(dim.unwrap_or(1))) } // TODO: default dim=1, but is it correct?
-    fn __neg__(&self) -> PyResult<Tensor> { Ok(-self.clone()) }
-    fn neg(&self) -> PyResult<Tensor> { Ok(-self.clone()) }
+    fn neg(&self)                           -> PyResult<Tensor> { Ok(-self.clone()) }
+    fn __neg__(&self)                       -> PyResult<Tensor> { Ok(-self.clone()) }
+    fn pow(&self, exp: f32)                 -> PyResult<Tensor> { Ok(self.pow_(exp)) }
+    fn relu(&self)                          -> PyResult<Tensor> { Ok(self.relu_()) }
+    fn exp(&self)                           -> PyResult<Tensor> { Ok(self.exp_()) }
+    fn sigmoid(&self)                       -> PyResult<Tensor> { Ok(self.sigmoid_()) }
+    fn log(&self)                           -> PyResult<Tensor> { Ok(self.log_()) }
+    fn softmax(&self, dim: Option<usize>)   -> PyResult<Tensor> { Ok(self.softmax_(dim.unwrap_or(1))) } // TODO: default dim=1, but is it correct?
 
     // reduce ops
-    fn sum(&self) -> PyResult<Tensor> { Ok(self.sum_()) }
-    fn mean(&self) -> PyResult<Tensor> { Ok(self.mean_()) }
+    fn sum(&self)                           -> PyResult<Tensor> { Ok(self.sum_()) }
+    fn mean(&self)                          -> PyResult<Tensor> { Ok(self.mean_()) }
 
     // movement ops
-    fn reshape(&self, shape: Vec<usize>) -> PyResult<Tensor> {  Ok(self.reshape_(shape)) }
+    fn reshape(&self, shape: Vec<usize>)                        -> PyResult<Tensor> {  Ok(self.reshape_(shape)) }
     fn flatten(&self, start_dim: usize, end_dim: Option<usize>) -> PyResult<Tensor> { Ok(self.flatten_(start_dim, end_dim.unwrap_or(self.0.shape.len()-1)) ) }
 
     // functional nn ops
-    fn linear(&self, weight: &Tensor, bias: Option<&Tensor>) -> PyResult<Tensor> { Ok(self.linear_(weight, bias)) }
-    fn sparse_categorical_crossentropy(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.sparse_categorical_crossentropy_(other)) }   
+    fn linear(&self, weight: &Tensor, bias: Option<&Tensor>)    -> PyResult<Tensor> { Ok(self.linear_(weight, bias)) }
+    fn sparse_categorical_crossentropy(&self, other: &Tensor)   -> PyResult<Tensor> { Ok(self.sparse_categorical_crossentropy_(other)) }   
 
     // only for python api
     #[staticmethod]

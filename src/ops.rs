@@ -4,11 +4,11 @@ pub enum Ops {
     Add,
     Mul,
     Matmul,
+    Neg,
     Pow,
     Relu,
     Exp,
     Log,
-    Neg,
     Sum,
     Reshape
 }

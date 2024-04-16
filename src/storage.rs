@@ -82,9 +82,6 @@ impl Storage {
         for (i, g) in o0.grad.iter_mut().enumerate() {
             *g += self.grad[i] * o1.data[i];
         }
-        // for (i, g) in o1.grad.iter_mut().enumerate() {
-        //     *g += self.grad[i] * o0.data[i];
-        // }
     }
     // reference: https://github.com/tinygrad/tinygrad/blob/master/extra/gemm/gemm.c
     pub fn matmul_2d(&self, other: &Storage, dim: Vec<usize>) -> Storage {
@@ -92,7 +89,7 @@ impl Storage {
         let other_data = other.data.clone();
         let mut out_data = vec![0.0; dim[0] * dim[2]];
 
-        for i in 0..dim[0] {
+        for i in 0..dim[0] { // TODO: need to optimize
             for j in (0..dim[2]).step_by(BLOCK) {
 
                 if j+BLOCK < dim[2] {
@@ -158,6 +155,15 @@ impl Storage {
     }
 
     // unary ops
+    pub fn neg(&self) -> Storage {
+        let data = self.data.iter().map(|a| -a).collect();
+        Self::new(data)
+    }
+    pub fn neg_back(&self, other: &mut Storage) {
+        for (i, g) in other.grad.iter_mut().enumerate() {
+            *g += -self.grad[i];
+        }
+    }
     pub fn pow(&self, exp: f32) -> Storage {
         let data = self.data.iter().map(|a| a.powf(exp)).collect();
         Self::new(data)
@@ -192,15 +198,6 @@ impl Storage {
     pub fn log_back(&self, other: &mut Storage) {
         for (i, g) in other.grad.iter_mut().enumerate() {
             *g += self.grad[i] / other.data[i];
-        }
-    }
-    pub fn neg(&self) -> Storage {
-        let data = self.data.iter().map(|a| -a).collect();
-        Self::new(data)
-    }
-    pub fn neg_back(&self, other: &mut Storage) {
-        for (i, g) in other.grad.iter_mut().enumerate() {
-            *g += -self.grad[i];
         }
     }
 
