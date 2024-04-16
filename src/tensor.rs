@@ -3,6 +3,7 @@ use crate::Storage;
 
 use numpy::PyArray;
 use numpy::PyArrayDyn;
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use std::collections::HashSet;
 use std::ops::Deref;
@@ -17,9 +18,7 @@ struct Context {
 }
 
 impl Context {
-    fn new(prev: Vec<Tensor>, op: Option<Ops>, op_ctx: Option<f32>) -> Self {
-        Self { prev, op, op_ctx, }
-    }
+    fn new(prev: Vec<Tensor>, op: Option<Ops>, op_ctx: Option<f32>) -> Self { Self { prev, op, op_ctx, } }
     fn walk(&self, now: &Tensor) { 
         if let Some(op) = self.op {
             match op {
@@ -189,9 +188,7 @@ impl Add<Tensor> for Tensor {
     type Output = Tensor;
     fn add(self, other: Tensor) -> Self::Output {
         let (a, b) = self.broadcast_(&other);
-        
         let c_storage = a.0.storage.read().unwrap().deref().add(b.0.storage.read().unwrap().deref());
-
         Tensor::new(
             c_storage, 
             a.0.shape.clone(), 
@@ -200,25 +197,9 @@ impl Add<Tensor> for Tensor {
         )
     }
 }
-impl Add<f32> for Tensor {
-    type Output = Tensor;
-    fn add(self, other: f32) -> Self::Output { self + Tensor::scalar_(other) }
-}
-impl Add<Tensor> for f32 {
-    type Output = Tensor;
-    fn add(self, other: Tensor) -> Self::Output { Tensor::scalar_(self) + other }
-}
 impl Sub<Tensor> for Tensor {
     type Output = Tensor;
     fn sub(self, other: Tensor) -> Self::Output { self + (-other) }
-}
-impl Sub<f32> for Tensor {
-    type Output = Tensor;
-    fn sub(self, other: f32) -> Self::Output { self - Tensor::scalar_(other) }
-}
-impl Sub<Tensor> for f32 {
-    type Output = Tensor;
-    fn sub(self, other: Tensor) -> Self::Output { Tensor::scalar_(self) - other }
 }
 impl Mul<Tensor> for Tensor {
     type Output = Tensor;
@@ -235,30 +216,13 @@ impl Mul<Tensor> for Tensor {
         )
     }
 }
-impl Mul<f32> for Tensor {
-    type Output = Tensor;
-    fn mul(self, other: f32) -> Self::Output { self * Tensor::scalar_(other) }
-}
-impl Mul<Tensor> for f32 {
-    type Output = Tensor;
-    fn mul(self, other: Tensor) -> Self::Output { Tensor::scalar_(self) * other }
-}
 impl Div<Tensor> for Tensor {
     type Output = Tensor;
     fn div(self, other: Tensor) -> Self::Output { self * other.pow_(-1.0) }
 }
-impl Div<f32> for Tensor {
-    type Output = Tensor;
-    fn div(self, other: f32) -> Self::Output { self / Tensor::scalar_(other) }
-}
-impl Div<Tensor> for f32 {
-    type Output = Tensor;
-    fn div(self, other: Tensor) -> Self::Output { Tensor::scalar_(self) / other }
-}
 
 impl Tensor {
     fn matmul_2d_(self, other: &Tensor) -> Tensor {
-        // TODO: rewrite matmul using add, mul, reshape, permute, etc.
         let dim_0 = self.0.shape[0];
         let dim_1 = self.0.shape[1];
         let dim_2 = other.0.shape[1];
@@ -479,7 +443,7 @@ impl Tensor {
             None,
         );
 
-        return -(yonehot * ypred.log_()).sum_() / y.0.shape[0] as f32
+        return -(yonehot * ypred.log_()).sum_() / Tensor::scalar_(y.0.shape[0] as f32);
     }
 }
 
@@ -545,6 +509,14 @@ fn print_data(v: &Tensor) -> String {
     formulate_string(&v.0.storage.read().unwrap().get_data(), &v.0.shape, 0, 0)
 }
 
+fn operate<F>(tensor: &Tensor, other: &PyAny, op: F) -> PyResult<Tensor>
+where
+    F: Fn(&Tensor, &Tensor) -> Tensor, {
+    if let Ok(other) = other.extract::<Tensor>() { Ok(op(tensor, &other)) }
+    else if let Ok(other) = other.extract::<f32>() { Ok(op(tensor, &Tensor::scalar_(other))) }
+    else { Err(PyErr::new::<PyTypeError, _>("unsupported operand type(s)")) }
+}
+
 #[pymethods]
 impl Tensor {
     #[new]
@@ -558,14 +530,19 @@ impl Tensor {
     fn backward(&self) -> PyResult<()> { Ok(self.backward_()) }
 
     // binary ops
-    fn __add__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() + other.clone()) }
-    fn add(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() + other.clone()) }
-    fn __sub__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() - other.clone()) }
-    fn sub(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() - other.clone()) }
-    fn __mul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() * other.clone()) }
-    fn mul(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() * other.clone()) }
-    fn __truediv__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() / other.clone()) }
-    fn div(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() / other.clone()) }
+    fn add(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() + b.clone()) }
+    fn __add__(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() + b.clone()) }
+    fn __radd__(&self, other: &PyAny) -> PyResult<Tensor> { self.add(other) }
+    fn sub(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() - b.clone()) }
+    fn __sub__(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() - b.clone()) }
+    fn __rsub__(&self, other: &PyAny) -> PyResult<Tensor> { self.sub(other) }
+    fn mul(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() * b.clone()) }
+    fn __mul__(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() * b.clone()) }
+    fn __rmul__(&self, other: &PyAny) -> PyResult<Tensor> { self.mul(other) }
+    fn div(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() / b.clone()) }
+    fn __truediv__(&self, other: &PyAny) -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() / b.clone()) }
+    fn __rtruediv__(&self, other: &PyAny) -> PyResult<Tensor> { self.div(other) }
+
     fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
     fn matmul(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
     fn dot(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
@@ -658,7 +635,6 @@ impl Tensor {
     #[staticmethod] 
     fn kaiming_uniform(shape: Vec<usize>, a: f32, seed: Option<u64>) -> PyResult<Tensor> {
         // https://pytorch.org/docs/stable/_modules/torch/nn/init.html#kaiming_uniform_
-        // TODO: if seed exists, using seed
         let bound = (3.0 as f32).powf(0.5) * (2.0 / (1.0 + a.powf(2.0))).powf(0.5) / (shape.iter().product::<usize>() as f32 / shape[0] as f32).powf(0.5);
         Tensor::uniform(shape, -bound, bound, seed)
     }
