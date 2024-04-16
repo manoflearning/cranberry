@@ -292,7 +292,7 @@ impl Neg for Tensor {
             out_storage,
             self.0.shape.clone(), 
             self.0.requires_grad, 
-            Some(Context::new(vec![self.clone()], Some(Ops::Neg),None))
+            Some(Context::new(vec![self.clone()], Some(Ops::Neg), None))
         )
     }
 }
@@ -304,7 +304,7 @@ impl Tensor {
             out_storage,
             self.0.shape.clone(), 
             self.0.requires_grad, 
-            Some(Context::new(vec![self.clone()], Some(Ops::Pow),Some(exp)))
+            Some(Context::new(vec![self.clone()], Some(Ops::Pow), Some(exp)))
         )
     }
     fn relu_(&self) -> Tensor {
@@ -313,7 +313,7 @@ impl Tensor {
             out_storage,
             self.0.shape.clone(), 
             self.0.requires_grad, 
-            Some(Context::new(vec![self.clone()], Some(Ops::Relu),None))
+            Some(Context::new(vec![self.clone()], Some(Ops::Relu), None))
         )
     }
     fn exp_(&self) -> Tensor {
@@ -393,7 +393,7 @@ impl Tensor {
         Tensor {
             0: Arc::new(
                 RawTensor {
-                    id: self.0.id,
+                    id: TensorId::new(),
                     storage: self.0.storage.clone(),
                     requires_grad: self.0.requires_grad,
                     ctx: Some(Context::new(vec![self.clone()], Some(Ops::Reshape), None)),
@@ -507,8 +507,7 @@ fn print_data(v: &Tensor) -> String {
 }
 
 fn operate<F>(tensor: &Tensor, other: &PyAny, op: F) -> PyResult<Tensor>
-where
-    F: Fn(&Tensor, &Tensor) -> Tensor, {
+where F: Fn(&Tensor, &Tensor) -> Tensor {
     if let Ok(other) = other.extract::<Tensor>() { Ok(op(tensor, &other)) }
     else if let Ok(other) = other.extract::<f32>() { Ok(op(tensor, &Tensor::scalar_(other))) }
     else { Err(PyErr::new::<PyTypeError, _>("unsupported operand type(s)")) }
@@ -531,10 +530,12 @@ impl Tensor {
     fn sub(&self, other: &PyAny)            -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() - b.clone()) }
     fn mul(&self, other: &PyAny)            -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() * b.clone()) }
     fn div(&self, other: &PyAny)            -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() / b.clone()) }
+
     fn __add__(&self, other: &PyAny)        -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() + b.clone()) }
     fn __sub__(&self, other: &PyAny)        -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() - b.clone()) }
     fn __mul__(&self, other: &PyAny)        -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() * b.clone()) }
     fn __truediv__(&self, other: &PyAny)    -> PyResult<Tensor> { operate(self, other, |a, b| a.clone() / b.clone()) }
+    
     fn __radd__(&self, other: &PyAny)       -> PyResult<Tensor> { operate(self, other, |a, b| b.clone() + a.clone()) }
     fn __rsub__(&self, other: &PyAny)       -> PyResult<Tensor> { operate(self, other, |a, b| b.clone() - a.clone()) }
     fn __rmul__(&self, other: &PyAny)       -> PyResult<Tensor> { operate(self, other, |a, b| b.clone() * a.clone()) }
