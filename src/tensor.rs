@@ -63,6 +63,10 @@ impl Context {
     }
 }
 
+// ********************************************************
+// ***************          tensor          ***************
+// ********************************************************
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct TensorId(usize);
 impl TensorId {
@@ -83,83 +87,12 @@ struct RawTensor {
     // TODO: DType, Device
 }
 
-// ********************************************************
-// ***************          tensor          ***************
-// ********************************************************
-
 // cannot modify tensor directly after it is created
 // need Mutex or RwLock to be able to modify the tensor
 // https://github.com/huggingface/candle/blob/main/candle-core/src/tensor.rs
 #[pyclass]
 #[derive(Clone)]
 pub struct Tensor(Arc<RawTensor>);
-
-impl Tensor {
-    fn new(storage: Storage, shape: Vec<usize>, requires_grad: bool, ctx: Option<Context>) -> Self {
-        Tensor(Arc::new(
-            RawTensor {
-                id: TensorId::new(),
-                storage: Arc::new(RwLock::new(storage)),
-                requires_grad,
-                ctx,
-                shape,
-            }
-        ))
-    }
-
-    fn zeros_(shape: Vec<usize>) -> Tensor {
-        let out_data = vec![0.0; shape.iter().product()];
-        Tensor::new(Storage::new(out_data), shape, false, None)
-    }
-    fn ones_(shape: Vec<usize>) -> Tensor {
-        let out_data = vec![1.0; shape.iter().product()];
-        Tensor::new(Storage::new(out_data), shape, false, None)
-    }
-
-    // TODO: if seed exists, using seed
-    fn uniform_(shape: Vec<usize>, low: f32, high: f32, _seed: Option<u64>) -> Tensor {
-        let data: Vec<f32> = (0..shape.iter().product()).map(|_| rand::random::<f32>() * (high - low) + low).collect();
-        Tensor::new(
-            Storage::new(data), 
-            shape,
-            true,
-            None
-        )
-    }
-    // https://pytorch.org/docs/stable/_modules/torch/nn/init.html#kaiming_uniform_
-    fn kaiming_uniform_(shape: Vec<usize>, a: f32, seed: Option<u64>) -> Tensor {
-        let bound = (3.0 as f32).powf(0.5) 
-            * (2.0 / (1.0 + a.powf(2.0))).powf(0.5) 
-            / (shape.iter().product::<usize>() as f32 / shape[0] as f32).powf(0.5);
-        Tensor::uniform_(shape, -bound, bound, seed)
-    }
-
-    pub fn zero_grad_(&self) { self.0.storage.write().unwrap().init_grad_to_zero(); }
-    pub fn step_(&self, lr: f32) { self.0.storage.write().unwrap().step(lr); }
-
-    // https://pytorch.org/docs/stable/generated/torch.Tensor.detach.html
-    fn detach_(&self) -> Tensor {
-        Tensor::new(
-            self.0.storage.read().unwrap().clone(), 
-            self.0.shape.clone(), 
-            false, 
-            None
-        )
-    }
-
-    #[inline]
-    fn len_(&self) -> usize { self.0.shape.iter().product() }
-}
-
-impl PartialEq for Tensor {
-    // https://pytorch.org/docs/stable/generated/torch.equal.html
-    fn eq(&self, other: &Self) -> bool {
-        let mut out = true;
-        out &= self.0.storage.read().unwrap().get_data() == other.0.storage.read().unwrap().get_data();
-        out &= self.0.shape == other.0.shape;
-        out
-    }
-}
 
 // ********************************************************
 // ***************      backward prop       ***************
@@ -198,7 +131,6 @@ impl Tensor {
 // ***************     broadcasting ops     ***************
 // ********************************************************
 
-// TODO: handle broadcasting using storage, not a tensor
 impl Tensor {
     #[inline]
     fn broadcast_each_(&self, shape: &Vec<usize>) -> Tensor {
@@ -214,8 +146,8 @@ impl Tensor {
             None,
         )))
     }
-    // https://numpy.org/doc/stable/user/basics.broadcasting.html
     fn broadcast_(&self, other: &Tensor) -> (Tensor, Tensor) {
+        // https://numpy.org/doc/stable/user/basics.broadcasting.html
         let mut s_shape = self.0.shape.clone();
         let mut o_shape = other.0.shape.clone();
 
@@ -268,12 +200,26 @@ impl Add<Tensor> for Tensor {
         )
     }
 }
-
+impl Add<f32> for Tensor {
+    type Output = Tensor;
+    fn add(self, other: f32) -> Self::Output { self + Tensor::scalar_(other) }
+}
+impl Add<Tensor> for f32 {
+    type Output = Tensor;
+    fn add(self, other: Tensor) -> Self::Output { Tensor::scalar_(self) + other }
+}
 impl Sub<Tensor> for Tensor {
     type Output = Tensor;
     fn sub(self, other: Tensor) -> Self::Output { self + (-other) }
 }
-
+impl Sub<f32> for Tensor {
+    type Output = Tensor;
+    fn sub(self, other: f32) -> Self::Output { self - Tensor::scalar_(other) }
+}
+impl Sub<Tensor> for f32 {
+    type Output = Tensor;
+    fn sub(self, other: Tensor) -> Self::Output { Tensor::scalar_(self) - other }
+}
 impl Mul<Tensor> for Tensor {
     type Output = Tensor;
     fn mul(self, other: Tensor) -> Self::Output {
@@ -289,14 +235,30 @@ impl Mul<Tensor> for Tensor {
         )
     }
 }
-
+impl Mul<f32> for Tensor {
+    type Output = Tensor;
+    fn mul(self, other: f32) -> Self::Output { self * Tensor::scalar_(other) }
+}
+impl Mul<Tensor> for f32 {
+    type Output = Tensor;
+    fn mul(self, other: Tensor) -> Self::Output { Tensor::scalar_(self) * other }
+}
 impl Div<Tensor> for Tensor {
     type Output = Tensor;
     fn div(self, other: Tensor) -> Self::Output { self * other.pow_(-1.0) }
 }
+impl Div<f32> for Tensor {
+    type Output = Tensor;
+    fn div(self, other: f32) -> Self::Output { self / Tensor::scalar_(other) }
+}
+impl Div<Tensor> for f32 {
+    type Output = Tensor;
+    fn div(self, other: Tensor) -> Self::Output { Tensor::scalar_(self) / other }
+}
 
 impl Tensor {
     fn matmul_2d_(self, other: &Tensor) -> Tensor {
+        // TODO: rewrite matmul using add, mul, reshape, permute, etc.
         let dim_0 = self.0.shape[0];
         let dim_1 = self.0.shape[1];
         let dim_2 = other.0.shape[1];
@@ -313,8 +275,8 @@ impl Tensor {
             Some(Context::new(vec![self.clone(), other.clone()], Some(Ops::Matmul),None))
         )
     }
-    // https://pytorch.org/docs/stable/generated/torch.matmul.html
     fn matmul_(self, other: &Tensor) -> Tensor {
+        // https://pytorch.org/docs/stable/generated/torch.matmul.html
         let self_shape = self.0.shape.clone();
         let other_shape = other.0.shape.clone();
         // if both tensors are 1-dimensional, the dot product (scalar) is returned
@@ -337,7 +299,7 @@ impl Tensor {
             let a = self.reshape_(vec![1, self_shape[0]]);
             return a.matmul_2d_(other)
         }
-        // If the first argument is 2-dimensional and the second argument is 1-dimensional, the matrix-vector product is returned.
+        // if the first argument is 2-dimensional and the second argument is 1-dimensional, the matrix-vector product is returned
         else if self_shape.len() == 2 && other_shape.len() == 1 {
             assert!(self_shape[1] == other_shape[0], "Tensor dimensions must match");
             let b = other.reshape_(vec![other_shape[0], 1]);
@@ -390,8 +352,8 @@ impl Tensor {
         let one = Tensor::new(Storage::new(vec![1.0]), vec![], false, None);
         one.clone() / (one.clone() + (-self.clone()).exp_())
     }
-    // https://pytorch.org/docs/stable/generated/torch.log.html
     fn log_(&self) -> Tensor {
+        // https://pytorch.org/docs/stable/generated/torch.log.html
         let out_storage = self.0.storage.read().unwrap().deref().log();
         Tensor::new(
             out_storage,
@@ -417,14 +379,7 @@ impl Tensor {
         }
         fill_num(0, &mut num_data, &num_shape, 0, self_exp.0.storage.read().unwrap().get_data(), &self_exp.0.shape, 0);
 
-        let num = Tensor::new(
-            Storage::new(num_data),
-            num_shape,
-            false,
-            None,
-        );
-
-        self_exp / num
+        self_exp / Tensor::new(Storage::new(num_data), num_shape, false, None)
     }
 }
 
@@ -446,8 +401,8 @@ impl Neg for Tensor {
 // ********************************************************
 
 impl Tensor {
-    // https://pytorch.org/docs/stable/generated/torch.sum.html
     fn sum_(&self) -> Tensor {
+        // https://pytorch.org/docs/stable/generated/torch.sum.html
         let out_storage = self.0.storage.read().unwrap().deref().sum();
         Tensor::new(
             out_storage,
@@ -456,15 +411,10 @@ impl Tensor {
             Some(Context::new(vec![self.clone()], Some(Ops::Sum), None))
         )
     }
-    // https://pytorch.org/docs/stable/generated/torch.mean.html
+    
     fn mean_(&self) -> Tensor {
-        let num = Tensor::new(
-            Storage::new(vec![self.len_() as f32]),
-            vec![],
-            false,
-            None,
-        );
-        self.sum_() / num
+        // https://pytorch.org/docs/stable/generated/torch.mean.html
+        self.sum_() / Tensor::scalar_(self.len_() as f32)
     }
 }
 
@@ -473,26 +423,24 @@ impl Tensor {
 // ********************************************************
 
 impl Tensor {
-    // https://pytorch.org/docs/stable/generated/torch.reshape.html
-    // TODO: if shape contains -1, then it will be calculated automatically
-    // TODO: what if reshape is called on a tensor that requires grad?
     fn reshape_(&self, n_shape: Vec<usize>) -> Tensor {
+        // https://pytorch.org/docs/stable/generated/torch.reshape.html
+        // TODO: if shape contains -1, then it will be calculated automatically
+        // TODO: can i do this using Tensor::new()?
         assert!(self.len_() == n_shape.iter().product(), "cannot reshape tensor of size {} into shape {:?}", self.len_(), n_shape);
 
         Tensor {
             0: Arc::new(
                 RawTensor {
-                    id: TensorId::new(),
+                    id: self.0.id,
                     storage: self.0.storage.clone(),
                     requires_grad: self.0.requires_grad,
-                    ctx: Some(Context::new(vec![self.clone()], Some(Ops::Reshape),None)),
+                    ctx: Some(Context::new(vec![self.clone()], Some(Ops::Reshape), None)),
                     shape: n_shape,
                 }
             )
         }
     }
-    // https://pytorch.org/docs/stable/generated/torch.transpose.html
-    fn transpose_(&self, _dim0: usize, _dim1: usize) -> Tensor { unimplemented!(); }
     fn flatten_(&self, start_dim: usize, end_dim: usize) -> Tensor {
         let mut n_shape = vec![];
         for i in 0..start_dim+1 { n_shape.push(self.0.shape[i]); }
@@ -513,6 +461,7 @@ impl Tensor {
         out
     }
     fn sparse_categorical_crossentropy_(&self, y: &Tensor) -> Tensor {
+        // TODO: do not need to calculate the onehot
         assert!(self.0.shape.len() == 2, "only support 2d tensor");
         assert!(y.0.shape.len() == 1, "only support 1d tensor");
 
@@ -530,19 +479,41 @@ impl Tensor {
             None,
         );
 
-        return -(yonehot * ypred.log_()).mean_()
+        return -(yonehot * ypred.log_()).sum_() / y.0.shape[0] as f32
     }
+}
+
+// ********************************************************
+// ***************          others          ***************
+// ********************************************************
+
+impl Tensor {
+    fn new(storage: Storage, shape: Vec<usize>, requires_grad: bool, ctx: Option<Context>) -> Self {
+        Tensor(Arc::new(
+            RawTensor {
+                id: TensorId::new(),
+                storage: Arc::new(RwLock::new(storage)),
+                requires_grad,
+                ctx,
+                shape,
+            }
+        ))
+    }
+    #[inline]
+    fn len_(&self) -> usize { self.0.shape.iter().product() }
+    #[inline]
+    fn scalar_(data: f32) -> Tensor { Tensor::new(Storage::new(vec![data]), vec![], false, None) }
 }
 
 // ********************************************************
 // ***************      python wrapper      ***************
 // ********************************************************
 
-// TODO: implement the conversion that can detect the wrong shape
 #[derive(FromPyObject)]
 enum List<T> { Vector(Vec<List<T>>), Item(T), }
 #[pyfunction]
 fn process_list(list: List<f32>) -> (Vec<f32>, Vec<usize>) {
+    // TODO: implement the conversion that can detect the wrong shape
     match list {
         List::Vector(v) => {
             let mut data: Vec<f32> = vec![];
@@ -559,8 +530,8 @@ fn process_list(list: List<f32>) -> (Vec<f32>, Vec<usize>) {
     }
 }
 
-// TODO: need high readable print_data
 fn print_data(v: &Tensor) -> String {
+    // TODO: need high readable print_data
     fn formulate_string(data: &Vec<f32>, shape: &Vec<usize>, idx: usize, dep: usize) -> String {
         if dep == shape.len() { return format!("{:.4}", data[idx]); }
         let mut out = String::from("[");
@@ -574,7 +545,6 @@ fn print_data(v: &Tensor) -> String {
     formulate_string(&v.0.storage.read().unwrap().get_data(), &v.0.shape, 0, 0)
 }
 
-// TODO: erase boilerplate codes
 #[pymethods]
 impl Tensor {
     #[new]
@@ -582,67 +552,6 @@ impl Tensor {
         let (data, shape) = process_list(data);
         let requires_grad = requires_grad.unwrap_or(false);
         Ok(Tensor::new(Storage::new(data), shape, requires_grad, None))
-    }
-
-    #[staticmethod]
-    fn zeros(shape: Vec<usize>) -> PyResult<Tensor> { Ok(Tensor::zeros_(shape)) }
-    #[staticmethod]
-    fn ones(shape: Vec<usize>) -> PyResult<Tensor> { Ok(Tensor::ones_(shape)) }
-
-    #[staticmethod]
-    fn uniform(shape: Vec<usize>, low: f32, high: f32, seed: Option<u64>) -> PyResult<Tensor> { Ok(Tensor::uniform_(shape, low, high, seed)) }
-    #[staticmethod] 
-    fn kaiming_uniform(shape: Vec<usize>, a: f32, seed: Option<u64>) -> PyResult<Tensor> { Ok(Tensor::kaiming_uniform_(shape, a, seed)) }
-    
-    fn zero_grad(&self) -> PyResult<()> { Ok(self.zero_grad_()) }
-    fn step(&self, lr: f32) -> PyResult<()> { Ok(self.step_(lr)) }
-
-    fn detach(&self) -> PyResult<Tensor> { Ok(self.detach_()) }
-
-    fn __eq__(&self, other: &Tensor) -> PyResult<bool> { Ok(self == other) }
-
-    fn __str__(&self) -> PyResult<String> {
-        Ok(format!("tensor({}, requires_grad={:?})", print_data(self), self.0.requires_grad))
-    }
-
-    fn numpy(&self) -> PyResult<Py<PyArrayDyn<f32>>> {
-        let shape = self.0.shape.clone();
-        let data = self.0.storage.read().unwrap().get_data().clone();
-
-        Python::with_gil(|py| {
-            let array = PyArray::from_vec(py, data).reshape(shape)?.to_dyn();
-            Ok(array.to_owned())
-        })
-    }
-
-    #[getter]
-    fn data(&self) -> PyResult<Py<PyArrayDyn<f32>>> {
-        let shape = self.0.shape.clone();
-        let data = self.0.storage.read().unwrap().get_data().clone();
-
-        Python::with_gil(|py| {
-            let array = PyArray::from_vec(py, data).reshape(shape)?.to_dyn();
-            Ok(array.to_owned())
-        })
-    }
-    #[getter]
-    fn grad(&self) -> PyResult<Py<PyArrayDyn<f32>>> {
-        let shape = self.0.shape.clone();
-        let grad = self.0.storage.read().unwrap().get_grad().clone();
-
-        Python::with_gil(|py| {
-            let array = PyArray::from_vec(py, grad).reshape(shape)?.to_dyn();
-            Ok(array.to_owned())
-        })
-    }
-    #[getter]
-    fn shape(&self) -> PyResult<Vec<usize>> { Ok(self.0.shape.clone()) }
-    #[getter]
-    fn requires_grad(&self) -> PyResult<bool> { Ok(self.0.requires_grad) }
-
-    fn item(&self) -> PyResult<f32> {
-        assert!(self.0.shape == vec![], "only one element tensors can be converted to Python scalars");
-        Ok(self.0.storage.read().unwrap().get_data()[0])
     }
 
     // backward prop
@@ -677,10 +586,80 @@ impl Tensor {
 
     // movement ops
     fn reshape(&self, shape: Vec<usize>) -> PyResult<Tensor> {  Ok(self.reshape_(shape)) }
-    fn transpose(&self, dim0: usize, dim1: usize) -> PyResult<Tensor> { Ok(self.transpose_(dim0, dim1)) }
     fn flatten(&self, start_dim: usize, end_dim: Option<usize>) -> PyResult<Tensor> { Ok(self.flatten_(start_dim, end_dim.unwrap_or(self.0.shape.len()-1)) ) }
 
     // functional nn ops
     fn linear(&self, weight: &Tensor, bias: Option<&Tensor>) -> PyResult<Tensor> { Ok(self.linear_(weight, bias)) }
-    fn sparse_categorical_crossentropy(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.sparse_categorical_crossentropy_(other)) }
+    fn sparse_categorical_crossentropy(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.sparse_categorical_crossentropy_(other)) }   
+
+    // only for python api
+    #[staticmethod]
+    fn zeros(shape: Vec<usize>) -> PyResult<Tensor> {
+        let out_data = vec![0.0; shape.iter().product()];
+        Ok(Tensor::new(Storage::new(out_data), shape, false, None))
+    }
+    #[staticmethod]
+    fn ones(shape: Vec<usize>) -> PyResult<Tensor> {
+        let out_data = vec![1.0; shape.iter().product()];
+        Ok(Tensor::new(Storage::new(out_data), shape, false, None))
+    }
+    fn zero_grad(&self) -> PyResult<()> { Ok(self.0.storage.write().unwrap().init_grad_to_zero()) }
+    fn step(&self, lr: f32) -> PyResult<()> { Ok(self.0.storage.write().unwrap().step(lr)) }
+    fn detach(&self) -> PyResult<Tensor> {
+        // https://pytorch.org/docs/stable/generated/torch.Tensor.detach.html
+        Ok(Tensor::new(self.0.storage.read().unwrap().clone(), self.0.shape.clone(), false, None))
+    }
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!("tensor({}, requires_grad={:?})", print_data(self), self.0.requires_grad))
+    }
+    fn numpy(&self) -> PyResult<Py<PyArrayDyn<f32>>> {
+        let shape = self.0.shape.clone();
+        let data = self.0.storage.read().unwrap().get_data().clone();
+
+        Python::with_gil(|py| {
+            let array = PyArray::from_vec(py, data).reshape(shape)?.to_dyn();
+            Ok(array.to_owned())
+        })
+    }
+    #[getter]
+    fn data(&self) -> PyResult<Py<PyArrayDyn<f32>>> {
+        let shape = self.0.shape.clone();
+        let data = self.0.storage.read().unwrap().get_data().clone();
+
+        Python::with_gil(|py| {
+            let array = PyArray::from_vec(py, data).reshape(shape)?.to_dyn();
+            Ok(array.to_owned())
+        })
+    }
+    #[getter]
+    fn grad(&self) -> PyResult<Py<PyArrayDyn<f32>>> {
+        let shape = self.0.shape.clone();
+        let grad = self.0.storage.read().unwrap().get_grad().clone();
+
+        Python::with_gil(|py| {
+            let array = PyArray::from_vec(py, grad).reshape(shape)?.to_dyn();
+            Ok(array.to_owned())
+        })
+    }
+    #[getter]
+    fn shape(&self) -> PyResult<Vec<usize>> { Ok(self.0.shape.clone()) }
+    #[getter]
+    fn requires_grad(&self) -> PyResult<bool> { Ok(self.0.requires_grad) }
+    fn item(&self) -> PyResult<f32> {
+        assert!(self.0.shape == vec![], "only one element tensors can be converted to Python scalars");
+        Ok(self.0.storage.read().unwrap().get_data()[0])
+    }
+    #[staticmethod]
+    fn uniform(shape: Vec<usize>, low: f32, high: f32, _seed: Option<u64>) -> PyResult<Tensor> {
+        // TODO: if seed exists, using seed
+        let data: Vec<f32> = (0..shape.iter().product()).map(|_| rand::random::<f32>() * (high - low) + low).collect();
+        Ok(Tensor::new(Storage::new(data), shape, true, None))
+    }
+    #[staticmethod] 
+    fn kaiming_uniform(shape: Vec<usize>, a: f32, seed: Option<u64>) -> PyResult<Tensor> {
+        // https://pytorch.org/docs/stable/_modules/torch/nn/init.html#kaiming_uniform_
+        // TODO: if seed exists, using seed
+        let bound = (3.0 as f32).powf(0.5) * (2.0 / (1.0 + a.powf(2.0))).powf(0.5) / (shape.iter().product::<usize>() as f32 / shape[0] as f32).powf(0.5);
+        Tensor::uniform(shape, -bound, bound, seed)
+    }
 }
