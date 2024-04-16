@@ -400,6 +400,32 @@ impl Tensor {
             Some(Context::new(vec![self.clone()], Some(Ops::Log), None))
         )
     }
+    fn softmax_(&self, dim: usize) -> Tensor {
+        let self_exp = self.clone().exp_();
+
+        let mut num_data: Vec<f32> = vec![0.0; self.len_() / self.0.shape[dim]];
+        let mut num_shape = self.0.shape.clone();
+        num_shape[dim] = 1;
+
+        fn fill_num(num_idx: usize, num_data: &mut Vec<f32>, num_shape: &Vec<usize>, idx: usize, data: &Vec<f32>, shape: &Vec<usize>, dep: usize) {
+            if dep == shape.len() { num_data[num_idx] += data[idx]; return; }
+            for i in 0..shape[dep] {
+                let n_num_idx = num_idx * num_shape[dep] + i % num_shape[dep];
+                let n_idx = idx * shape[dep] + i;
+                fill_num(n_num_idx, num_data, num_shape, n_idx, data, shape, dep + 1);
+            }
+        }
+        fill_num(0, &mut num_data, &num_shape, 0, self_exp.0.storage.read().unwrap().get_data(), &self_exp.0.shape, 0);
+
+        let num = Tensor::new(
+            Storage::new(num_data),
+            num_shape,
+            false,
+            None,
+        );
+
+        self_exp / num
+    }
 }
 
 impl Neg for Tensor {
@@ -439,37 +465,6 @@ impl Tensor {
             None,
         );
         self.sum_() / num
-    }
-    fn softmax_(&self, dim: usize) -> Tensor {
-        let self_exp = self.clone().exp_();
-
-        let mut num_data: Vec<f32> = vec![0.0; self.len_() / self.0.shape[dim]];
-        let mut num_shape = self.0.shape.clone();
-        num_shape[dim] = 1;
-
-        fn fill_num(num_idx: usize, num_data: &mut Vec<f32>, num_shape: &Vec<usize>, idx: usize, data: &Vec<f32>, shape: &Vec<usize>, dep: usize) {
-            if dep == shape.len() {
-                num_data[num_idx] += data[idx];
-                return;
-            }
-
-            for i in 0..shape[dep] {
-                let n_num_idx = num_idx * num_shape[dep] + i % num_shape[dep];
-                let n_idx = idx * shape[dep] + i;
-                fill_num(n_num_idx, num_data, num_shape, n_idx, data, shape, dep + 1);
-            }
-        }
-
-        fill_num(0, &mut num_data, &num_shape, 0, self_exp.0.storage.read().unwrap().get_data(), &self.0.shape, 0);
-
-        let num = Tensor::new(
-            Storage::new(num_data),
-            num_shape,
-            false,
-            None,
-        );
-
-        self_exp / num
     }
 }
 
@@ -522,16 +517,10 @@ impl Tensor {
         assert!(y.0.shape.len() == 1, "only support 1d tensor");
 
         let ypred = self.softmax_(1);
-
         let y_data = y.0.storage.read().unwrap().get_data().clone();
         let mut yonehot_data = vec![0.0; ypred.len_()];
         for i in 0..ypred.0.shape[0] {
-            for j in 0..ypred.0.shape[1] {
-                if j == (y_data[i] + 0.001) as usize {
-                    yonehot_data[i * ypred.0.shape[1] + j] = 1.0;
-                }
-                else { yonehot_data[i * ypred.0.shape[1] + j] = 0.0; }
-            }
+            yonehot_data[i * ypred.0.shape[1] + (y_data[i] + 0.0001) as usize] = 1.0;
         }
 
         let yonehot = Tensor::new(
@@ -541,8 +530,7 @@ impl Tensor {
             None,
         );
 
-        let one = Tensor::ones_(vec![1]);
-        return -(yonehot.clone() * ypred.clone().log_() + (one.clone()- yonehot.clone()) * (one.clone() - ypred.clone()).log_()).mean_()
+        return -(yonehot * ypred.log_()).mean_()
     }
 }
 
@@ -586,6 +574,7 @@ fn print_data(v: &Tensor) -> String {
     formulate_string(&v.0.storage.read().unwrap().get_data(), &v.0.shape, 0, 0)
 }
 
+// TODO: erase boilerplate codes
 #[pymethods]
 impl Tensor {
     #[new]
@@ -651,14 +640,23 @@ impl Tensor {
     #[getter]
     fn requires_grad(&self) -> PyResult<bool> { Ok(self.0.requires_grad) }
 
+    fn item(&self) -> PyResult<f32> {
+        assert!(self.0.shape == vec![], "only one element tensors can be converted to Python scalars");
+        Ok(self.0.storage.read().unwrap().get_data()[0])
+    }
+
     // backward prop
     fn backward(&self) -> PyResult<()> { Ok(self.backward_()) }
 
     // binary ops
     fn __add__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() + other.clone()) }
+    fn add(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() + other.clone()) }
     fn __sub__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() - other.clone()) }
+    fn sub(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() - other.clone()) }
     fn __mul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() * other.clone()) }
+    fn mul(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() * other.clone()) }
     fn __truediv__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() / other.clone()) }
+    fn div(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone() / other.clone()) }
     fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
     fn matmul(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
     fn dot(&self, other: &Tensor) -> PyResult<Tensor> { Ok(self.clone().matmul_(&other)) }
@@ -669,12 +667,13 @@ impl Tensor {
     fn exp(&self) -> PyResult<Tensor> { Ok(self.exp_()) }
     fn sigmoid(&self) -> PyResult<Tensor> { Ok(self.sigmoid_()) }
     fn log(&self) -> PyResult<Tensor> { Ok(self.log_()) }
+    fn softmax(&self, dim: Option<usize>) -> PyResult<Tensor> { Ok(self.softmax_(dim.unwrap_or(1))) } // TODO: default dim=1, but is it correct?
     fn __neg__(&self) -> PyResult<Tensor> { Ok(-self.clone()) }
+    fn neg(&self) -> PyResult<Tensor> { Ok(-self.clone()) }
 
     // reduce ops
     fn sum(&self) -> PyResult<Tensor> { Ok(self.sum_()) }
     fn mean(&self) -> PyResult<Tensor> { Ok(self.mean_()) }
-    fn softmax(&self, dim: Option<usize>) -> PyResult<Tensor> { Ok(self.softmax_(dim.unwrap_or(1))) } // TODO: default dim=1, but is it correct?
 
     // movement ops
     fn reshape(&self, shape: Vec<usize>) -> PyResult<Tensor> {  Ok(self.reshape_(shape)) }
