@@ -279,7 +279,7 @@ class TestCranberry(unittest.TestCase):
     def test_backward_pass_1(self):
         def test_cranberry():
             x = cr.Tensor(-4.0, requires_grad=True)
-            z = cr.Tensor(2.0) * x + cr.Tensor(2.0) + x
+            z = 2.0 * x + 2.0 + x
             q = z.relu() + z * x
             h = (z * z).relu()
             y = h + q + q * x

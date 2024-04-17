@@ -5,9 +5,7 @@ const BLOCK: usize = 64;
 #[repr(align(32))]
 pub struct Storage {
     data: Vec<f32>,
-    // TODO: Option<Vec<f32>>
     grad: Vec<f32>,
-    // TODO: DType, Device
 }
 
 impl Storage {
@@ -17,11 +15,7 @@ impl Storage {
 
     pub fn init_grad_to_zero(&mut self) { self.grad = vec![0.0; self.data.len()]; }
     pub fn init_grad_to_one(&mut self) { self.grad = vec![1.0; self.data.len()]; }
-    pub fn step(&mut self, lr: f32) {
-        for i in 0..self.data.len() {
-            self.data[i] -= lr * self.grad[i];
-        }
-    }
+    pub fn step(&mut self, lr: f32) { for i in 0..self.data.len() { self.data[i] -= lr * self.grad[i]; } }
 
     pub fn get_data(&self) -> &Vec<f32> { &self.data }
     pub fn get_grad(&self) -> &Vec<f32> { &self.grad }
@@ -83,8 +77,8 @@ impl Storage {
             *g += self.grad[i] * o1.data[i];
         }
     }
-    // reference: https://github.com/tinygrad/tinygrad/blob/master/extra/gemm/gemm.c
     pub fn matmul_2d(&self, other: &Storage, dim: Vec<usize>) -> Storage {
+        // reference: https://github.com/tinygrad/tinygrad/blob/master/extra/gemm/gemm.c
         let self_data = self.data.clone();
         let other_data = other.data.clone();
         let mut out_data = vec![0.0; dim[0] * dim[2]];

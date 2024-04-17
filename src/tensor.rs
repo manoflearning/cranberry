@@ -83,7 +83,6 @@ struct RawTensor {
     requires_grad: bool,
     ctx: Option<Context>,
     shape: Vec<usize>,
-    // TODO: DType, Device
 }
 
 // cannot modify tensor directly after it is created
