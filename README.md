@@ -1,1 +1,52 @@
-In progress
+# Cranberry
+
+A one-person developing deep learning framework.
+Rust is used for internal operations, and Python is used as the API language.
+Cranberry provides a PyTorch-like API, making it easy to learn and use.
+For now, it focuses on writing code that runs fast and stable on top of the CPU. 
+Multiple accelerators, including NVIDIA GPU (CUDA), will be supported soon.
+
+## Implemented Operations
+
+* Binary Ops: ```Add```, ```Sub```, ```Mul```, ```Div```, ```Matmul```
+* Unary Ops: ```Neg```, ```Pow```, ```ReLU```, ```Exp```, ```Sigmoid```, ```Log```, ```Softmax```
+* Reduce Ops: ```Sum```, ```Mean```
+* Movement Ops: ```Reshape```, ```Flatten```
+* Functional NN Ops: ```Linear```, ```Sparse Categorical Crossentropy```
+* ```Broadcasting```
+* ```Backward Propagation```
+
+## Usage
+
+```py
+from cranberry import Tensor, nn, optim
+from cranberry.features.datasets import mnist
+
+X_train, Y_train, X_test, Y_test = mnist()
+X_train, X_test = X_train.flatten(1), X_test.flatten(1)
+
+model = nn.Sequential(
+    nn.Linear(784, 128), Tensor.relu,
+    nn.Linear(128, 64), Tensor.relu,
+    nn.Linear(64, 10)
+)
+
+optimizer = optim.SGD(model.parameters(), lr=0.001)
+
+for i in range(100):
+    # forward
+    loss = model(X_train).sparse_categorical_crossentropy(Y_train)
+    # backward
+    optimizer.zero_grad()
+    loss.backward()
+    # update
+    optimizer.step()
+
+    print(f"epoch {i}, loss {loss.item():.4f}")
+```
+
+See [examples/demo.ipynb](/examples/demo.ipynb) and [examples/mnist.py](/examples/mnist.py) for additional examples.
+
+## Installation
+
+The installation guide will be provided soon.
