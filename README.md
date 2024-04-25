@@ -6,16 +6,6 @@ Cranberry provides a PyTorch-like API, making it easy to learn and use.
 For now, it focuses on writing code that runs fast and stable on top of the CPU. 
 Multiple accelerators, including NVIDIA GPU (CUDA), will be supported soon.
 
-## Implemented Operations
-
-* Binary Ops: ```Add```, ```Sub```, ```Mul```, ```Div```, ```Matmul```
-* Unary Ops: ```Neg```, ```Pow```, ```ReLU```, ```Exp```, ```Sigmoid```, ```Log```, ```Softmax```
-* Reduce Ops: ```Sum```, ```Mean```
-* Movement Ops: ```Reshape```, ```Flatten```
-* Functional NN Ops: ```Linear```, ```Sparse Categorical Crossentropy```
-* ```Broadcasting```
-* ```Backward Propagation```
-
 ## Usage
 
 ```py
