@@ -33,6 +33,9 @@ venv/
 .installed.cfg
 *.egg
 
+share/
+*.cfg
+
 .github/
 
 # Installer logs
