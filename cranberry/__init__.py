@@ -1,3 +1,2 @@
 from .cranberry import *
-
-__version__ = '0.1.0'
+from cranberry.tensor import Tensor

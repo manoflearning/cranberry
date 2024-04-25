@@ -1,11 +1,10 @@
-from typing import Tuple, Union
-from cranberry import Tensor
+from cranberry.tensor import Tensor
+from typing import List
 
 # TODO: implement more detailed SGD
 class SGD:
-    def __init__(self, params: list, lr: float):
-        self.params = params
-        self.lr = lr
+    def __init__(self, params: List[Tensor], lr: float):
+        self.params, self.lr = params, lr
 
     def zero_grad(self):
         for p in self.params: p.zero_grad()

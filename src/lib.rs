@@ -2,18 +2,12 @@
 use pyo3::prelude::*;
 use thread_priority::*;
 
-mod ops;
-use ops::Ops;
-
-mod storage;
-use storage::Storage;
-
-mod tensor;
-use tensor::Tensor;
+mod core;
+use core::Core;
 
 #[pymodule]
 fn cranberry(_py: Python, m: &PyModule) -> PyResult<()> {
     assert!(set_current_thread_priority(ThreadPriority::Min).is_ok()); // is this really working?
-    m.add_class::<Tensor>()?;
+    m.add_class::<Core>()?;
     Ok(())
 }

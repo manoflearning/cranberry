@@ -1,0 +1,360 @@
+from __future__ import annotations
+import math
+from cranberry.ops import Op, UnaryOps, BinaryOps, ReduceOps, MovementOps
+import time
+from typing import List, Optional, Set, Tuple, Union
+import numpy as np
+from math import prod
+
+def flatten_list(list: List) -> List:
+    flat = []
+    for item in list:
+        if isinstance(item, List): flat.extend(flatten_list(item))
+        else: flat.append(item)
+    return flat
+def shape_for_list(list: List) -> Tuple[int]:
+    shape = []
+    while isinstance(list, List):
+        shape.append(len(list))
+        list = list[0]
+    return tuple(shape)
+
+class Tensor:
+    def __init__(self, 
+                 # TODO: remove np.ndarray for data, grad, and replace with Core
+                 data: Union[float, int, List, np.ndarray, np.float32],
+                 grad: Optional[np.ndarray] = None,
+                 # TODO: remove shape, and replace with View
+                 shape: Optional[Tuple[int]] = None,
+                 requires_grad: bool = False, 
+                 prev: Optional[Tuple[Tensor]] = None, 
+                 op: Optional[Op] = None): # TODO: dtype, device
+        # self._data
+        if isinstance(data, (float, int)): self._data = np.array(data, dtype=np.float32)
+        elif isinstance(data, List): self._data = np.array(data, dtype=np.float32)
+        elif isinstance(data, (np.ndarray, np.float32)): self._data = data
+        else: raise ValueError(f"Invalid data type {type(data)}")
+        
+        # self._grad
+        self._grad = grad if grad is not None else np.zeros_like(self._data) # TODO: if requires_grad is False, then grad should be None
+
+        # self._shape
+        if shape is not None: self._shape = shape
+        elif isinstance(data, (float, int)): self._shape = ()
+        elif isinstance(data, List): self._shape = shape_for_list(data)
+        elif isinstance(data, (np.ndarray, np.float32)): self._shape = data.shape
+        else: raise ValueError(f"Invalid data type {type(data)}")
+
+        assert self._shape == self._data.shape, f"shape {self._shape} must match data shape {self._data.shape}"
+        assert self._shape == self._grad.shape, f"shape {self._shape} must match grad shape {self._grad.shape}"
+
+        # self._requires_grad
+        self._requires_grad: bool = requires_grad
+        # self._backward
+        self._backward = lambda: None
+        # self._prev
+        self._prev: Optional[Tuple[Tensor]] = prev
+        # self._op
+        self._op = op
+
+    # ********************************************************
+    # ***************      backward prop       ***************
+    # ********************************************************
+
+    def backward(self):
+        assert self._requires_grad, "cannot call backward on a tensor that doesn't require gradients"
+        assert self.shape == tuple(), f"backward can only be called for scalar tensors, but it has shape {self.shape})"
+
+        topo = []
+        visited = set()
+        def dfs(t: Tensor):
+            visited.add(t)
+            if t._prev is not None:
+                for v in t._prev: dfs(v)
+            topo.append(t)
+        dfs(self)
+
+        self._grad.fill(1.0)
+        for v in reversed(topo):
+            if v._requires_grad: v._backward()
+
+    def zero_grad(self): self._grad.fill(0.0)
+    def step(self, lr: float): self._data -= lr * self._grad
+
+    # ********************************************************
+    # ***************       broadcasting       ***************
+    # ********************************************************
+    
+    def _broadcasted(self, other: Tensor) -> Tuple[Tensor, Tensor]:
+        shape1, shape2 = self.shape, other.shape
+        while len(shape1) < len(shape2): shape1 = (1,) + shape1
+        while len(shape2) < len(shape1): shape2 = (1,) + shape2
+        assert all(s1 == s2 or s1 == 1 or s2 == 1 for s1, s2 in zip(shape1, shape2)), f"cannot broadcast shapes {self.shape} and {other.shape}"
+        shape = tuple(max(s1, s2) for s1, s2 in zip(shape1, shape2))
+        self = self if self.shape == shape else self.expand(*shape)
+        other = other if other.shape == shape else other.expand(*shape)
+        return self, other
+
+    # ********************************************************
+    # ***************         unary ops        ***************
+    # ********************************************************
+
+    def _unary_op(self, op: UnaryOps) -> Tensor:
+        out = Tensor._dummy(shape=self._shape, requires_grad=self.requires_grad, prev=(self,), op=op)
+        if op == UnaryOps.NEG:
+            out._data -= self._data
+            def backward(): self._grad -= out._grad
+            out._backward = backward
+        elif op == UnaryOps.SQRT:
+            out._data = np.sqrt(self._data)
+            def backward(): self._grad += 0.5 * out._grad / out._data
+            out._backward = backward
+        elif op == UnaryOps.RELU:
+            out._data = self._data * (self._data > 0)
+            def backward(): self._grad += out._grad * (self._data > 0)
+            out._backward = backward
+        elif op == UnaryOps.EXP:
+            out._data = np.exp(self._data)
+            def backward(): self._grad += out._grad * out._data
+            out._backward = backward
+        elif op == UnaryOps.LOG:
+            out._data = np.log(self._data)
+            def backward(): self._grad += out._grad / self._data
+            out._backward = backward
+        else: raise RuntimeError(f"Invalid unary op {op}")
+        return out
+    def neg(self) -> Tensor: return self._unary_op(UnaryOps.NEG)
+    def sqrt(self) -> Tensor: return self._unary_op(UnaryOps.SQRT)
+    def relu(self) -> Tensor: return self._unary_op(UnaryOps.RELU)
+    def exp(self) -> Tensor: return self._unary_op(UnaryOps.EXP)
+    def log(self) -> Tensor: return self._unary_op(UnaryOps.LOG)
+    def sigmoid(self) -> Tensor: return 1 / (1 + self.neg().exp()) # 1 / (1 + exp(-x)) or exp(x) / (1 + exp(x))
+
+    # ********************************************************
+    # ***************        binary ops        ***************
+    # ********************************************************
+
+    def _binary_op(self, other: Union[Tensor, int, float], reverse: bool, op: BinaryOps) -> Tensor:
+        if isinstance(other, (int, float)): other = Tensor(other)
+        self, other = self._broadcasted(other)
+        if reverse: self, other = other, self
+
+        out = Tensor._dummy(shape=self._shape, requires_grad=self.requires_grad or other.requires_grad, prev=(self,other), op=op)
+        if op == BinaryOps.ADD:
+            out._data = self._data + other._data
+            def backward():
+                self._grad += out._grad
+                other._grad += out._grad
+            out._backward = backward
+        elif op == BinaryOps.SUB:
+            out._data = self._data - other._data
+            def backward():
+                self._grad += out._grad
+                other._grad -= out._grad
+            out._backward = backward
+        elif op == BinaryOps.MUL:
+            out._data = self._data * other._data
+            def backward():
+                self._grad += out._grad * other._data
+                other._grad += out._grad * self._data
+            out._backward = backward
+        elif op == BinaryOps.DIV:
+            out._data = self._data / other._data
+            def backward():
+                self._grad += out._grad / other._data
+                other._grad -= out._grad * self._data / other._data ** 2
+            out._backward = backward
+        else: raise RuntimeError(f"Invalid binary op {op}")
+        return out
+    def add(self, other: Union[Tensor, int, float], reverse: bool = False) -> Tensor: return self._binary_op(other, reverse, BinaryOps.ADD)
+    def sub(self, other: Union[Tensor, int, float], reverse: bool = False) -> Tensor: return self._binary_op(other, reverse, BinaryOps.SUB)
+    def mul(self, other: Union[Tensor, int, float], reverse: bool = False) -> Tensor: return self._binary_op(other, reverse, BinaryOps.MUL)
+    def div(self, other: Union[Tensor, int, float], reverse: bool = False) -> Tensor: return self._binary_op(other, reverse, BinaryOps.DIV)
+    
+    # ********************************************************
+    # ***************        reduce ops        ***************
+    # ********************************************************
+
+    def _reduce_op(self, *args, op: ReduceOps) -> Tensor:
+        out = Tensor._dummy(shape=(), requires_grad=self.requires_grad, prev=(self,), op=op)
+        if op == ReduceOps.SUM:
+            out._data = self._data.sum(axis=args[0])
+            out._shape = out._data.shape # every time we do the ops, we need to update the shape
+            def backward(): self._grad += out._grad
+            out._backward = backward
+        else: raise RuntimeError(f"Invalid reduce op {op}")
+        return out
+    def sum(self, axis: Optional[int] = None) -> Tensor: return self._reduce_op(axis, op=ReduceOps.SUM)
+
+    # ********************************************************
+    # ***************       movement ops       ***************
+    # ********************************************************
+    
+    def _movement_op(self, *args, op: MovementOps) -> Tensor:
+        out = Tensor._dummy(shape=args[0], requires_grad=self.requires_grad, prev=(self,), op=op)
+        if op == MovementOps.RESHAPE:
+            out._data = self._data.reshape(args[0])
+            out._grad = self._grad.reshape(args[0])
+        elif op == MovementOps.EXPAND: # can we make this zero-copy?
+            out._data = np.copy(np.broadcast_to(self._data, args[0]))
+            out._grad = np.copy(np.broadcast_to(self._grad, args[0]))
+            def backward():
+                axis1, axis2 = [], []
+                for i in range(len(out._shape) - len(self._shape)): axis1.append(i)
+                for i, s in enumerate(self._grad.shape):
+                    if s == 1: axis2.append(i)
+                self._grad += out._grad.sum(axis=tuple(axis1), keepdims=False).sum(axis=tuple(axis2), keepdims=True)
+            out._backward = backward
+        elif op == MovementOps.PERMUTE:
+            out._data = self._data.transpose(args[1])
+            out._grad = self._grad.transpose(args[1])
+        else: raise RuntimeError(f"Invalid movement op {op}")
+        return out
+
+    def reshape(self, *shape: int) -> Tensor:
+        assert shape.count(-1) <= 1, "can only specify one unknown dimension"
+        assert all(s > 0 or s == -1 for s in shape), "shape dimensions must be positive or -1"
+
+        if shape.count(-1) == 1:
+            assert prod(self._shape) % -prod(shape) == 0, f"cannot reshape tensor of size {prod(self._shape)} into shape {shape}"
+            shape = tuple(s if s != -1 else prod(self._shape) // -prod(shape) for s in shape)
+        assert prod(shape) == prod(self._shape), f"cannot reshape tensor of size {prod(self._shape)} into shape {shape}"
+
+        return self._movement_op(shape, op=MovementOps.RESHAPE)
+    
+    # https://pytorch.org/docs/stable/generated/torch.Tensor.expand.html
+    def expand(self, *shape: int) -> Tensor:
+        assert len(shape) >= len(self.shape), f"the expanded shape {shape} must have at least as many dimensions as the original shape {self.shape}"
+        assert all(s == 1 or s == e for s,e in zip(self.shape, shape[-len(self.shape):])), "the expanded shape must be compatible with the original shape"
+        return self._movement_op(shape, op=MovementOps.EXPAND)
+
+    def permute(self, *dims: int) -> Tensor:
+        assert set(dims) == set(range(len(self.shape))), "invalid permutation {dims}"
+        return self._movement_op(tuple(self.shape[dims[i]] for i in range(len(dims))), dims, op=MovementOps.PERMUTE)
+    
+    def flatten(self, start_dim: int = 0, end_dim: int = -1) -> Tensor:
+        if end_dim == -1: end_dim = len(self.shape)
+        assert 0 <= start_dim < end_dim <= len(self.shape), "invalid start_dim or end_dim"
+        return self.reshape(*(self.shape[:start_dim] + (prod(self.shape[start_dim:end_dim]),) + self.shape[end_dim:]))
+    
+    def transpose(self, dim1:int, dim2:int) -> Tensor:
+        dims = list(range(len(self.shape)))
+        dims[dim1], dims[dim2] = dims[dim2], dims[dim1]
+        return self.permute(*dims)
+
+    # ********************************************************
+    # ***************      processing ops      ***************
+    # ********************************************************
+
+    def matmul_2d(self, other: Tensor) -> Tensor:
+        assert len(self.shape) == 2 and len(other.shape) == 2, "matmul_2d only supports 2D tensors, but got shapes {self.shape} and {other.shape}"
+        assert self.shape[1] == other.shape[0], f"matmul_2d shape mismatch: {self.shape} and {other.shape}"
+        N, M, K = self.shape[0], self.shape[1], other.shape[1]
+        return (self.reshape(N, 1, M) * other.permute(1, 0).reshape(1, K, M)).sum(axis=2)
+    def matmul(self, other: Tensor) -> Tensor:
+        # https://pytorch.org/docs/stable/generated/torch.matmul.html
+        # if both tensors are 1-dimensional, the dot product (scalar) is returned
+        if len(self.shape) == 1 and len(other.shape) == 1:
+            assert self.shape[0] == other.shape[0], f"matmul shape mismatch: {self.shape} and {other.shape}"
+            return self.mul(other).sum()
+        # if both arguments are 2-dimensional, the matrix-matrix product is returned
+        elif len(self.shape) == 2 and len(other.shape) == 2: return self.matmul_2d(other)
+        # if the first argument is 1-dimensional and the second argument is 2-dimensional,
+        # a 1 is prepended to its dimension for the purpose of the matrix multiply
+        # after the matrix multiply, the prepended dimension is removed
+        elif len(self.shape) == 1 and len(other.shape) == 2: return self.reshape(1, *self.shape).matmul_2d(other)
+        # if the first argument is 2-dimensional and the second argument is 1-dimensional, the matrix-vector product is returned
+        elif len(self.shape) == 2 and len(other.shape) == 1: return self.matmul_2d(other.reshape(*other.shape, 1)).reshape(-1)
+        # if both arguments are at least 1-dimensional and at least one argument is N-dimensional (where N > 2), then a batched matrix multiply is returned
+        # if the first argument is 1-dimensional, a 1 is prepended to its dimension for the purpose of the batched matrix multiply and removed after
+        # if the second argument is 1-dimensional, a 1 is appended to its dimension for the purpose of the batched matrix multiple and removed after
+        # the non-matrix (i.e. batch) dimensions are broadcasted (and thus must be broadcastable)
+        elif len(self.shape) >= 1 and len(other.shape) >= 1 and (len(self.shape) > 2 or len(other.shape) > 2):
+            raise NotImplementedError("batched matrix multiply is not implemented yet: {self.shape} and {other.shape}")
+        else: raise RuntimeError(f"Invalid matmul shapes {self.shape} and {other.shape}")
+
+    def dot(self, other: Tensor) -> Tensor: self.matmul(other)
+    def __matmul__(self, other: Tensor) -> Tensor: return self.matmul(other)
+
+    # ********************************************************
+    # ***************     functional nn ops    ***************
+    # ********************************************************
+
+    def linear(self, weight: Tensor, bias: Optional[Tensor]=None) -> Tensor:
+        x = self.matmul(weight)
+        return x.add(bias) if bias is not None else x
+
+    # ********************************************************
+    # ***************        op wrappers       ***************
+    # ********************************************************
+
+    def __neg__(self) -> Tensor: return self.neg()
+
+    def __add__(self, other) -> Tensor: return self.add(other)
+    def __sub__(self, other) -> Tensor: return self.sub(other)
+    def __mul__(self, other) -> Tensor: return self.mul(other)
+    def __truediv__(self, other) -> Tensor: return self.div(other)
+
+    def __radd__(self, other) -> Tensor: return self.add(other, True)
+    def __rsub__(self, other) -> Tensor: return self.sub(other, True)
+    def __rmul__(self, other) -> Tensor: return self.mul(other, True)
+    def __rtruediv__(self, other) -> Tensor: return self.div(other, True)
+
+    def __matmul__(self, other) -> Tensor: return self.matmul(other)
+
+    # ********************************************************
+    # ***************          random          ***************
+    # ********************************************************
+
+    _seed: int = int(time.time())
+    @staticmethod
+    def manual_seed(seed: int = 0): Tensor._seed= seed
+    @staticmethod
+    def _nxt_seed() -> int: 
+        Tensor._seed = (Tensor._seed * 1103515245 + 12345) & 0x7FFFFFFF
+        return Tensor._seed
+    @staticmethod
+    def randn(*shape: int) -> Tensor: 
+        np.random.seed(Tensor._nxt_seed())
+        return Tensor(data=np.random.randn(*shape), shape=shape, requires_grad=False, prev=None, op=None)
+    @staticmethod
+    def uniform(*shape: int, low = 0.0, high = 1.0) -> Tensor:
+        np.random.seed(Tensor._nxt_seed())
+        return Tensor(data=np.random.uniform(low, high, prod(shape)).reshape(shape), shape=shape, requires_grad=True, prev=None, op=None)
+    @staticmethod
+    def kaiming_uniform(*shape: int, a: float = 0.01) -> Tensor:
+        bound = math.sqrt(3.0) * math.sqrt(2.0 / (1 + a ** 2)) / math.sqrt(prod(shape[1:]))
+        return Tensor.uniform(*shape, low=-bound, high=bound)
+
+    # ********************************************************
+    # ***************      helper functions    ***************
+    # ********************************************************
+
+    @staticmethod
+    def _dummy(shape: Tuple[int], requires_grad: bool, prev: Optional[Tuple[Tensor]], op: Op):
+        return Tensor(data=np.zeros(shape), shape=shape, requires_grad=requires_grad, prev=prev, op=op)
+    @staticmethod
+    def zeros(*shape: int) -> Tensor:
+        return Tensor(data=np.zeros(shape), shape=shape, requires_grad=False, prev=None, op=None)
+    @staticmethod
+    def ones(*shape: int) -> Tensor:
+        return Tensor(data=np.ones(shape), shape=shape, requires_grad=False, prev=None, op=None)
+
+    def detach(self) -> Tensor: return Tensor(data=self._data, shape=self._shape, requires_grad=False, prev=None, op=None)
+    def numpy(self) -> np.ndarray: return self._data
+    @property
+    def data(self) -> np.ndarray: return self._data
+    @property
+    def grad(self) -> np.ndarray: return self._grad
+    @property
+    def shape(self) -> Tuple[int]: return self._shape
+    @property
+    def requires_grad(self) -> bool: return self._requires_grad
+
+    def item(self) -> float:
+        assert prod(self._shape) == 0, f"item() only supports tensors with a single element, but got shape {self.shape}"
+        return self._data.item()
+
+    def __hash__(self): return id(self)
+
+    def __repr__(self): return f"Tensor({self.numpy()})" # TODO: remove .numpy() here

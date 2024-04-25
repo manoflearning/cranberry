@@ -1,5 +1,7 @@
-from cranberry import Tensor, nn, optim
+from cranberry import Tensor
 from cranberry.features.datasets import mnist
+from cranberry import nn
+from cranberry.nn import optim
 
 # TODO: implement a model with conv2d, maxpool2d, etc.
 # https://towardsdatascience.com/going-beyond-99-mnist-handwritten-digits-recognition-cfff96337392
