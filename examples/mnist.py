@@ -1,7 +1,5 @@
-from cranberry import Tensor
+from cranberry import Tensor, nn
 from cranberry.features.datasets import mnist
-from cranberry import nn
-from cranberry.nn import optim
 
 # TODO: implement a model with conv2d, maxpool2d, etc.
 # https://towardsdatascience.com/going-beyond-99-mnist-handwritten-digits-recognition-cfff96337392
@@ -15,7 +13,7 @@ model = nn.Sequential(
     nn.Linear(64, 10)
 )
 
-optimizer = optim.SGD(model.parameters(), lr=0.001) # TODO: use Adam
+optimizer = nn.optim.SGD(model.parameters(), lr=0.001) # TODO: use Adam
 
 for i in range(100):
     # forward

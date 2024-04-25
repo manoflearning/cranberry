@@ -1,4 +1,5 @@
 from cranberry import Tensor
+from cranberry.nn import optim
 
 import math
 from typing import List, Callable
@@ -6,12 +7,12 @@ from typing import List, Callable
 class Linear:
     # https://github.com/tinygrad/tinygrad/blob/master/tinygrad/nn/__init__.py#L72-L80
     def __init__(self, in_features: int, out_features: int, bias=True):
-        self.weight = Tensor.kaiming_uniform(out_features, in_features, a=math.sqrt(5)).transpose(0, 1)
+        self.weight = Tensor.kaiming_uniform(out_features, in_features, a=math.sqrt(5))
         bound = 1 / math.sqrt(in_features)
         self.bias = Tensor.uniform(out_features, low=-bound, high=bound) if bias else None
 
     def __call__(self, x: Tensor) -> Tensor:
-        return x.linear(weight=self.weight, bias=self.bias)
+        return x.linear(weight=self.weight.transpose(0, 1), bias=self.bias)
 
     def __str__(self):
         return f"Linear(in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, bias={self.bias is not None})"        

@@ -2,7 +2,7 @@ from __future__ import annotations
 import math
 from cranberry.ops import Op, UnaryOps, BinaryOps, ReduceOps, MovementOps
 import time
-from typing import List, Optional, Set, Tuple, Union
+from typing import List, Optional, Tuple, Union
 import numpy as np
 from math import prod
 
@@ -185,6 +185,9 @@ class Tensor:
         else: raise RuntimeError(f"Invalid reduce op {op}")
         return out
     def sum(self, axis: Optional[int] = None) -> Tensor: return self._reduce_op(axis, op=ReduceOps.SUM)
+    def mean(self, axis: Optional[int] = None):
+        out = self.sum(axis=axis)
+        return out.div(prod(self.shape) / prod(out.shape)) if 0 not in out.shape else out
 
     # ********************************************************
     # ***************       movement ops       ***************
