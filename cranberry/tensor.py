@@ -86,13 +86,18 @@ class Tensor:
     # ********************************************************
     
     def _broadcasted(self, other: Tensor) -> Tuple[Tensor, Tensor]:
-        shape1, shape2 = self.shape, other.shape
+        shape1, shape2 = self._shape, other._shape
         while len(shape1) < len(shape2): shape1 = (1,) + shape1
         while len(shape2) < len(shape1): shape2 = (1,) + shape2
-        assert all(s1 == s2 or s1 == 1 or s2 == 1 for s1, s2 in zip(shape1, shape2)), f"cannot broadcast shapes {self.shape} and {other.shape}"
+        assert all(s1 == s2 or s1 == 1 or s2 == 1 for s1, s2 in zip(shape1, shape2)), f"cannot broadcast shapes {self._shape} and {other._shape}"
         shape = tuple(max(s1, s2) for s1, s2 in zip(shape1, shape2))
-        if self.shape != shape: self = self.expand(*shape)
-        if other.shape != shape: other = other.expand(*shape)
+        if self._shape != shape: self = self.expand(*shape)
+        if other._shape != shape: other = other.expand(*shape)
+        assert self._shape == other._shape, f"broadcasted shapes {self._shape} and {other._shape} must be the same"
+        assert self._shape == self._data.shape, f"broadcasted shapes {self._shape} and {self._data.shape} must match data shapes"
+        assert other._shape == other._data.shape, f"broadcasted shapes {other._shape} and {other._data.shape} must match data shapes"
+        assert self._shape == self._grad.shape, f"broadcasted shapes {self._shape} and {self._grad.shape} must match grad shapes"
+        assert other._shape == other._grad.shape, f"broadcasted shapes {other._shape} and {other._grad.shape} must match grad shapes"
         return self, other
 
     # ********************************************************
@@ -191,21 +196,26 @@ class Tensor:
     def _reduce_op(self, *args, op: ReduceOps) -> Tensor:
         out = Tensor._dummy(shape=(), requires_grad=self.requires_grad, prev=(self,), op=op)
         if op == ReduceOps.SUM:
-            out._data = self._data.sum(axis=args[0])
-            out._shape = out._data.shape # every time we do the ops, we need to update the shape
-            def backward(): self._grad += out._grad
+            out._data = self._data.sum(axis=args[0])    # TODO: remove this line
+            out._grad = np.zeros_like(out._data)        # TODO: remove this line
+            out._shape = out._data.shape                # TODO: remove this line
+            def backward(): # TODO: is this the best way to do this?
+                if args[0] is not None: o_new_shape = tuple(1 if i == args[0] else s for i, s in enumerate(self.shape))
+                else: o_new_shape = ()
+                self._grad = self._grad + out._grad.reshape(o_new_shape)
             out._backward = backward
         else: raise RuntimeError(f"Invalid reduce op {op}")
         return out
     def sum(self, dim: Optional[int] = None) -> Tensor: return self._reduce_op(dim, op=ReduceOps.SUM)
     def mean(self, dim: Optional[int] = None):
         out = self.sum(dim=dim)
-        return out.div(prod(self.shape) / prod(out.shape)) if 0 not in out.shape else out
+        return out.div(prod(self.shape) / prod(out.shape))
 
     # ********************************************************
     # ***************       movement ops       ***************
     # ********************************************************
     
+    # TODO: check when does reshape actually copy the data
     def _movement_op(self, *args, op: MovementOps) -> Tensor:
         out = Tensor._dummy(shape=args[0], requires_grad=self.requires_grad, prev=(self,), op=op)
         if op == MovementOps.RESHAPE:
