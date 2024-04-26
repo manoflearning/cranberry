@@ -21,8 +21,7 @@ def shape_for_list(list: List) -> Tuple[int]:
 
 class Tensor:
     def __init__(self, 
-                 # TODO: remove np.ndarray for data, grad, and replace with Core
-                 data: Union[float, int, List, np.ndarray, np.float32],
+                 data: Union[float, int, List, np.ndarray, np.float32], # TODO: bytes
                  grad: Optional[np.ndarray] = None,
                  # TODO: remove shape, and replace with View
                  shape: Optional[Tuple[int]] = None,
@@ -70,7 +69,8 @@ class Tensor:
         def dfs(t: Tensor):
             visited.add(t)
             if t._prev is not None:
-                for v in t._prev: dfs(v)
+                for v in t._prev:
+                    if v not in visited: dfs(v)
             topo.append(t)
         dfs(self)
 
@@ -91,8 +91,8 @@ class Tensor:
         while len(shape2) < len(shape1): shape2 = (1,) + shape2
         assert all(s1 == s2 or s1 == 1 or s2 == 1 for s1, s2 in zip(shape1, shape2)), f"cannot broadcast shapes {self.shape} and {other.shape}"
         shape = tuple(max(s1, s2) for s1, s2 in zip(shape1, shape2))
-        self = self if self.shape == shape else self.expand(*shape)
-        other = other if other.shape == shape else other.expand(*shape)
+        if self.shape != shape: self = self.expand(*shape)
+        if other.shape != shape: other = other.expand(*shape)
         return self, other
 
     # ********************************************************
@@ -124,6 +124,7 @@ class Tensor:
         else: raise RuntimeError(f"Invalid unary op {op}")
         return out
     def neg(self) -> Tensor: return self._unary_op(UnaryOps.NEG)
+    def __neg__(self) -> Tensor: return self.neg()
     def sqrt(self) -> Tensor: return self._unary_op(UnaryOps.SQRT)
     def relu(self) -> Tensor: return self._unary_op(UnaryOps.RELU)
     def exp(self) -> Tensor: return self._unary_op(UnaryOps.EXP)
@@ -170,6 +171,18 @@ class Tensor:
     def sub(self, other: Union[Tensor, int, float], reverse: bool = False) -> Tensor: return self._binary_op(other, reverse, BinaryOps.SUB)
     def mul(self, other: Union[Tensor, int, float], reverse: bool = False) -> Tensor: return self._binary_op(other, reverse, BinaryOps.MUL)
     def div(self, other: Union[Tensor, int, float], reverse: bool = False) -> Tensor: return self._binary_op(other, reverse, BinaryOps.DIV)
+
+    def __add__(self, other) -> Tensor: return self.add(other)
+    def __sub__(self, other) -> Tensor: return self.sub(other)
+    def __mul__(self, other) -> Tensor: return self.mul(other)
+    def __truediv__(self, other) -> Tensor: return self.div(other)
+
+    def __radd__(self, other) -> Tensor: return self.add(other, True)
+    def __rsub__(self, other) -> Tensor: return self.sub(other, True)
+    def __rmul__(self, other) -> Tensor: return self.mul(other, True)
+    def __rtruediv__(self, other) -> Tensor: return self.div(other, True)
+
+    # TODO: __lt__, __gt__, __ge__, __le__, __eq__, __ne__
     
     # ********************************************************
     # ***************        reduce ops        ***************
@@ -184,9 +197,9 @@ class Tensor:
             out._backward = backward
         else: raise RuntimeError(f"Invalid reduce op {op}")
         return out
-    def sum(self, axis: Optional[int] = None) -> Tensor: return self._reduce_op(axis, op=ReduceOps.SUM)
-    def mean(self, axis: Optional[int] = None):
-        out = self.sum(axis=axis)
+    def sum(self, dim: Optional[int] = None) -> Tensor: return self._reduce_op(dim, op=ReduceOps.SUM)
+    def mean(self, dim: Optional[int] = None):
+        out = self.sum(dim=dim)
         return out.div(prod(self.shape) / prod(out.shape)) if 0 not in out.shape else out
 
     # ********************************************************
@@ -202,11 +215,10 @@ class Tensor:
             out._data = np.copy(np.broadcast_to(self._data, args[0]))
             out._grad = np.copy(np.broadcast_to(self._grad, args[0]))
             def backward():
-                axis1, axis2 = [], []
-                for i in range(len(out._shape) - len(self._shape)): axis1.append(i)
-                for i, s in enumerate(self._grad.shape):
-                    if s == 1: axis2.append(i)
-                self._grad += out._grad.sum(axis=tuple(axis1), keepdims=False).sum(axis=tuple(axis2), keepdims=True)
+                s_shape, o_shape = self.shape, out.shape
+                while len(s_shape) < len(o_shape): s_shape = (1,) + s_shape
+                axis = tuple(i for i in range(len(o_shape)) if s_shape[i] == 1)
+                self._grad += out._grad.sum(axis=axis, keepdims=True).reshape(self.shape)
             out._backward = backward
         elif op == MovementOps.PERMUTE:
             out._data = self._data.transpose(args[1])
@@ -253,7 +265,7 @@ class Tensor:
         assert len(self.shape) == 2 and len(other.shape) == 2, "matmul_2d only supports 2D tensors, but got shapes {self.shape} and {other.shape}"
         assert self.shape[1] == other.shape[0], f"matmul_2d shape mismatch: {self.shape} and {other.shape}"
         N, M, K = self.shape[0], self.shape[1], other.shape[1]
-        return (self.reshape(N, 1, M) * other.permute(1, 0).reshape(1, K, M)).sum(axis=2)
+        return (self.reshape(N, 1, M) * other.permute(1, 0).reshape(1, K, M)).sum(dim=2)
     def matmul(self, other: Tensor) -> Tensor:
         # https://pytorch.org/docs/stable/generated/torch.matmul.html
         # if both tensors are 1-dimensional, the dot product (scalar) is returned
@@ -286,24 +298,8 @@ class Tensor:
     def linear(self, weight: Tensor, bias: Optional[Tensor]=None) -> Tensor:
         x = self.matmul(weight)
         return x.add(bias) if bias is not None else x
-
-    # ********************************************************
-    # ***************        op wrappers       ***************
-    # ********************************************************
-
-    def __neg__(self) -> Tensor: return self.neg()
-
-    def __add__(self, other) -> Tensor: return self.add(other)
-    def __sub__(self, other) -> Tensor: return self.sub(other)
-    def __mul__(self, other) -> Tensor: return self.mul(other)
-    def __truediv__(self, other) -> Tensor: return self.div(other)
-
-    def __radd__(self, other) -> Tensor: return self.add(other, True)
-    def __rsub__(self, other) -> Tensor: return self.sub(other, True)
-    def __rmul__(self, other) -> Tensor: return self.mul(other, True)
-    def __rtruediv__(self, other) -> Tensor: return self.div(other, True)
-
-    def __matmul__(self, other) -> Tensor: return self.matmul(other)
+    
+    def sparse_categorical_crossentropy(self, Y: Tensor) -> Tensor: NotImplemented
 
     # ********************************************************
     # ***************          random          ***************
@@ -359,5 +355,4 @@ class Tensor:
         return self._data.item()
 
     def __hash__(self): return id(self)
-
     def __repr__(self): return f"Tensor({self.numpy()})" # TODO: remove .numpy() here
