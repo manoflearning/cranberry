@@ -31,7 +31,7 @@ class Tensor:
         # self._data
         if isinstance(data, (float, int)): self._data = np.array(data, dtype=np.float32)
         elif isinstance(data, List): self._data = np.array(data, dtype=np.float32)
-        elif isinstance(data, (np.ndarray, np.float32)): self._data = data
+        elif isinstance(data, (np.ndarray, np.float32)): self._data = data.astype(np.float32)
         else: raise ValueError(f"Invalid data type {type(data)}")
         
         # self._grad
@@ -89,15 +89,9 @@ class Tensor:
         shape1, shape2 = self._shape, other._shape
         while len(shape1) < len(shape2): shape1 = (1,) + shape1
         while len(shape2) < len(shape1): shape2 = (1,) + shape2
-        assert all(s1 == s2 or s1 == 1 or s2 == 1 for s1, s2 in zip(shape1, shape2)), f"cannot broadcast shapes {self._shape} and {other._shape}"
         shape = tuple(max(s1, s2) for s1, s2 in zip(shape1, shape2))
         if self._shape != shape: self = self.expand(*shape)
         if other._shape != shape: other = other.expand(*shape)
-        assert self._shape == other._shape, f"broadcasted shapes {self._shape} and {other._shape} must be the same"
-        assert self._shape == self._data.shape, f"broadcasted shapes {self._shape} and {self._data.shape} must match data shapes"
-        assert other._shape == other._data.shape, f"broadcasted shapes {other._shape} and {other._data.shape} must match data shapes"
-        assert self._shape == self._grad.shape, f"broadcasted shapes {self._shape} and {self._grad.shape} must match grad shapes"
-        assert other._shape == other._grad.shape, f"broadcasted shapes {other._shape} and {other._grad.shape} must match grad shapes"
         return self, other
 
     # ********************************************************
@@ -361,7 +355,7 @@ class Tensor:
     def requires_grad(self) -> bool: return self._requires_grad
 
     def item(self) -> float:
-        assert prod(self._shape) == 0, f"item() only supports tensors with a single element, but got shape {self.shape}"
+        assert self._shape == (), f"item() only supports tensors with a single element, but got shape {self.shape}"
         return self._data.item()
 
     def __hash__(self): return id(self)
