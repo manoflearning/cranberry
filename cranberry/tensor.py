@@ -21,7 +21,7 @@ def shape_for_list(list: List) -> Tuple[int]:
 
 class Tensor:
     def __init__(self, 
-                 data: Union[float, int, List, np.ndarray, np.float32], # TODO: bytes
+                 data: Union[float, int, List, np.ndarray, np.float32],
                  grad: Optional[np.ndarray] = None,
                  # TODO: remove shape, and replace with View
                  shape: Optional[Tuple[int]] = None,
@@ -129,6 +129,9 @@ class Tensor:
     def exp(self) -> Tensor: return self._unary_op(UnaryOps.EXP)
     def log(self) -> Tensor: return self._unary_op(UnaryOps.LOG)
     def sigmoid(self) -> Tensor: return 1 / (1 + self.neg().exp()) # 1 / (1 + exp(-x)) or exp(x) / (1 + exp(x))
+    def tanh(self) -> Tensor: return (self.exp() - self.neg().exp()) / (self.exp() + self.neg().exp())
+    # TODO: gelu sanity check
+    def gelu(self) -> Tensor: 0.5 * self * (1 + (self * 0.7978845608 * (1 + 0.044715 * self * self)).tanh())
 
     # ********************************************************
     # ***************        binary ops        ***************
@@ -209,12 +212,15 @@ class Tensor:
     # ***************       movement ops       ***************
     # ********************************************************
     
-    # TODO: check when does reshape actually copy the data
     def _movement_op(self, *args, op: MovementOps) -> Tensor:
         out = Tensor._dummy(shape=args[0], requires_grad=self.requires_grad, prev=(self,), op=op)
         if op == MovementOps.RESHAPE:
             out._data = self._data.reshape(args[0])
             out._grad = self._grad.reshape(args[0])
+            def backward(): 
+                if out._grad.base is None: # TODO: initially, out._grad is a view of self._grad, but some reason it becomes a copy
+                    self._grad += out._grad.reshape(self.shape)
+            out._backward = backward
         elif op == MovementOps.EXPAND: # can we make this zero-copy?
             out._data = np.copy(np.broadcast_to(self._data, args[0]))
             out._grad = np.copy(np.broadcast_to(self._grad, args[0]))
@@ -260,6 +266,8 @@ class Tensor:
         dims = list(range(len(self.shape)))
         dims[dim1], dims[dim2] = dims[dim2], dims[dim1]
         return self.permute(*dims)
+    
+    def view(self, *shape: int) -> Tensor: return self.reshape(*shape)
 
     # ********************************************************
     # ***************      processing ops      ***************
@@ -303,7 +311,11 @@ class Tensor:
         x = self.matmul(weight)
         return x.add(bias) if bias is not None else x
     
-    def sparse_categorical_crossentropy(self, Y: Tensor) -> Tensor: NotImplemented
+    def layer_norm(self, weight: Tensor, bias: Optional[Tensor], eps: float = 1e-5) -> Tensor: NotImplementedError
+    
+    def dropout(self, p: float) -> Tensor: NotImplementedError
+    
+    def sparse_categorical_crossentropy(self, Y: Tensor) -> Tensor: NotImplementedError
 
     # ********************************************************
     # ***************          random          ***************
@@ -317,9 +329,9 @@ class Tensor:
         Tensor._seed = (Tensor._seed * 1103515245 + 12345) & 0x7FFFFFFF
         return Tensor._seed
     @staticmethod
-    def randn(*shape: int) -> Tensor: 
+    def randn(*shape: int, requires_grad: bool = False) -> Tensor: 
         np.random.seed(Tensor._nxt_seed())
-        return Tensor(data=np.random.randn(*shape), shape=shape, requires_grad=False, prev=None, op=None)
+        return Tensor(data=np.random.randn(*shape), shape=shape, requires_grad=requires_grad, prev=None, op=None)
     @staticmethod
     def uniform(*shape: int, low = 0.0, high = 1.0) -> Tensor:
         np.random.seed(Tensor._nxt_seed())
@@ -337,11 +349,11 @@ class Tensor:
     def _dummy(shape: Tuple[int], requires_grad: bool, prev: Optional[Tuple[Tensor]], op: Op):
         return Tensor(data=np.zeros(shape), shape=shape, requires_grad=requires_grad, prev=prev, op=op)
     @staticmethod
-    def zeros(*shape: int) -> Tensor:
-        return Tensor(data=np.zeros(shape), shape=shape, requires_grad=False, prev=None, op=None)
+    def zeros(*shape: int, requires_grad: bool = False) -> Tensor:
+        return Tensor(data=np.zeros(shape), shape=shape, requires_grad=requires_grad, prev=None, op=None)
     @staticmethod
-    def ones(*shape: int) -> Tensor:
-        return Tensor(data=np.ones(shape), shape=shape, requires_grad=False, prev=None, op=None)
+    def ones(*shape: int, requires_grad: bool = False) -> Tensor:
+        return Tensor(data=np.ones(shape), shape=shape, requires_grad=requires_grad, prev=None, op=None)
 
     def detach(self) -> Tensor: return Tensor(data=self._data, shape=self._shape, requires_grad=False, prev=None, op=None)
     def numpy(self) -> np.ndarray: return self._data
@@ -355,6 +367,8 @@ class Tensor:
     def requires_grad(self) -> bool: return self._requires_grad
     @property
     def op(self): return self._op
+    def size(self, dim: Optional[int] = None):
+        return self.shape if dim is None else self.shape[dim]
 
     def item(self) -> float:
         assert self._shape == (), f"item() only supports tensors with a single element, but got shape {self.shape}"
@@ -362,6 +376,6 @@ class Tensor:
 
     def __hash__(self): return id(self)
     def __repr__(self): 
-        out = f"Tensor({self.numpy()}"
+        out = f"Tensor({self.numpy().round(4)}"
         if self._op is not None: out += f", op={self._op.__repr__()}"
         return out + ")"
