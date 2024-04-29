@@ -1,6 +1,3 @@
-# https://github.com/tinygrad/tinygrad/blob/master/tinygrad/features/datasets.py
-# https://github.com/tinygrad/tinygrad/blob/master/tinygrad/helpers.py#L193-L207
-
 import gzip
 import hashlib
 from os import getenv
@@ -10,6 +7,7 @@ import tempfile
 from typing import Optional, Union
 import urllib.request
 
+import numpy as np
 from psutil import OSX
 from tqdm import tqdm
 from cranberry import Tensor
@@ -32,7 +30,7 @@ def fetch(url:str, name:Optional[Union[pathlib.Path, str]]=None, allow_caching=n
                 pathlib.Path(f.name).rename(fp)
     return fp
 
-def _fetch_mnist(file, offset): return Tensor(gzip.open(fetch("https://storage.googleapis.com/cvdf-datasets/mnist/"+file)).read()[offset:])
+def _fetch_mnist(file, offset): return Tensor(np.frombuffer(gzip.open(fetch("https://storage.googleapis.com/cvdf-datasets/mnist/"+file)).read()[offset:], dtype=np.uint8))
 def mnist():
-    return _fetch_mnist("train-images-idx3-ubyte.gz", 0x10).reshape([60000, 1, 28, 28]), _fetch_mnist("train-labels-idx1-ubyte.gz", 8), \
-        _fetch_mnist("t10k-images-idx3-ubyte.gz", 0x10).reshape([10000, 1, 28, 28]), _fetch_mnist("t10k-labels-idx1-ubyte.gz", 8)
+    return _fetch_mnist("train-images-idx3-ubyte.gz", 0x10).reshape(60000, 1, 28, 28), _fetch_mnist("train-labels-idx1-ubyte.gz", 8), \
+        _fetch_mnist("t10k-images-idx3-ubyte.gz", 0x10).reshape(10000, 1, 28, 28), _fetch_mnist("t10k-labels-idx1-ubyte.gz", 8)
