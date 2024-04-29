@@ -13,6 +13,8 @@ def trace(root: Tensor):
     build(root)
     return nodes, edges
 
+def truncate(s: str, length=10): return s if len(s) <= length else s[:length] + '...'
+
 def draw_graph(root: Tensor, format='svg', rankdir='TB'):
     """
     format: png | svg | ...
@@ -23,7 +25,10 @@ def draw_graph(root: Tensor, format='svg', rankdir='TB'):
     dot = Digraph(format=format, graph_attr={'rankdir': rankdir})
 
     for n in nodes:
-        dot.node(name=str(n.__hash__()), label=n.__repr__(), shape='record')
+        label = f"data = {truncate(str(n.data.round(2)))}"
+        if n.requires_grad: label += f"|grad = {truncate(str(n.grad.round(2)))}"
+        if n.op is not None: label += f"|op = {n.op.__repr__()}"
+        dot.node(name=str(n.__hash__()), label=label, shape='record')
     for n1, n2 in edges:
         dot.edge(str(n1.__hash__()), str(n2.__hash__()))
 

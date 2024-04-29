@@ -353,6 +353,8 @@ class Tensor:
     def shape(self) -> Tuple[int]: return self._shape
     @property
     def requires_grad(self) -> bool: return self._requires_grad
+    @property
+    def op(self): return self._op
 
     def item(self) -> float:
         assert self._shape == (), f"item() only supports tensors with a single element, but got shape {self.shape}"
@@ -360,7 +362,6 @@ class Tensor:
 
     def __hash__(self): return id(self)
     def __repr__(self): 
-        out = f"Tensor({self._data}"
+        out = f"Tensor({self.numpy()}"
         if self._op is not None: out += f", op={self._op.__repr__()}"
-        out += ")"
-        return out
+        return out + ")"
