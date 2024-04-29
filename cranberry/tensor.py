@@ -359,4 +359,8 @@ class Tensor:
         return self._data.item()
 
     def __hash__(self): return id(self)
-    def __repr__(self): return f"Tensor({self.numpy()}, op={self._op})"
+    def __repr__(self): 
+        out = f"Tensor({self._data}"
+        if self._op is not None: out += f", op={self._op.__repr__()}"
+        out += ")"
+        return out
