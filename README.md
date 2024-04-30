@@ -35,7 +35,3 @@ for i in range(100):
 ```
 
 See [examples/demo.ipynb](/examples/demo.ipynb) and [examples/mnist.py](/examples/mnist.py) for additional examples.
-
-## Installation
-
-The installation guide will be provided soon.
