@@ -16,10 +16,10 @@ model = nn.Sequential(
 optimizer = optim.SGD(model.parameters(), lr=0.001) # TODO: use Adam
 
 for i in range(100):
+    optimizer.zero_grad()
     # forward
     loss = model(X_train).sparse_categorical_crossentropy(Y_train)
     # backward
-    optimizer.zero_grad()
     loss.backward()
     # update
     optimizer.step()
