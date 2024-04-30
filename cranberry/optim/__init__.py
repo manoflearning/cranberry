@@ -1,4 +1,4 @@
-from cranberry.tensor import Tensor
+from cranberry import Tensor
 from typing import List
 
 # TODO: implement more detailed SGD

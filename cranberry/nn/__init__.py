@@ -1,5 +1,4 @@
 from cranberry import Tensor
-from cranberry.nn import optim
 
 import math
 from typing import List, Callable
