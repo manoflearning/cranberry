@@ -8,7 +8,7 @@ Multiple accelerators, including NVIDIA GPU (CUDA), will be supported soon.
 ## Usage
 
 ```py
-from cranberry import Tensor, nn
+from cranberry import Tensor, nn, optim
 from cranberry.features.datasets import mnist
 
 X_train, Y_train, X_test, Y_test = mnist()
@@ -20,7 +20,7 @@ model = nn.Sequential(
     nn.Linear(64, 10)
 )
 
-optimizer = nn.optim.SGD(model.parameters(), lr=0.001)
+optimizer = optim.SGD(model.parameters(), lr=0.001)
 
 for i in range(100):
     # forward
