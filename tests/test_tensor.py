@@ -3,14 +3,19 @@ from cranberry import Tensor
 import torch
 import unittest
 
-Tensor.manual_seed(1337)
 np.random.seed(1337)
+Tensor.manual_seed(1337)
+torch.manual_seed(1337)
 
 N, M, K = 54, 29, 17 # do not change these values
 A_np = np.random.randn(N, M).astype(np.float32)
 B_np = np.random.randn(N, M).astype(np.float32)
 C_np = np.random.randn(M, K).astype(np.float32)
 D_np = np.random.randn(1).astype(np.float32)
+E_np = np.random.randn(K).astype(np.float32)
+
+A_1d = np.random.randn(N).astype(np.float32)
+B_1d = np.random.randn(M).astype(np.float32)
 
 rtol, atol = 1e-4, 1e-4 # is this acceptable?
 
@@ -41,16 +46,16 @@ class TestCranberry(unittest.TestCase):
         for x, y in zip(test_cranberry(), test_pytorch()):
             np.testing.assert_allclose(x, y, rtol, atol)
 
-    def test_sqrt(self): # include negative values
+    def test_sqrt(self):
         def test_cranberry():
             A = Tensor(A_np, requires_grad=True)
-            out = A.sqrt()
+            out = (A.relu() + 1e-3).sqrt()
             out = out.sum()
             out.backward()
             return out.detach().numpy(), A.grad
         def test_pytorch():
             A = torch.tensor(A_np, requires_grad=True)
-            out = A.sqrt()
+            out = (A.relu() + 1e-3).sqrt()
             out = out.sum()
             out.backward()
             return out.detach().numpy(), A.grad
@@ -92,16 +97,16 @@ class TestCranberry(unittest.TestCase):
         for x, y in zip(test_cranberry(), test_pytorch()):
             np.testing.assert_allclose(x, y, rtol, atol)
 
-    def test_log(self): # include nan/inf tests
+    def test_log(self):
         def test_cranberry():
             A = Tensor(A_np, requires_grad=True)
-            out = A.log()
+            out = (A.relu() + 1e-3).log()
             out = out.sum()
             out.backward()
             return out.detach().numpy(), A.grad
         def test_pytorch():
             A = torch.tensor(A_np, requires_grad=True)
-            out = A.log()
+            out = (A.relu() + 1e-3).log()
             out = out.sum()
             out.backward()
             return out.detach().numpy(), A.grad
@@ -363,29 +368,99 @@ class TestCranberry(unittest.TestCase):
 
     # processing ops: matmul
 
-    def test_matmul_2d(self):
+    def test_matml_1d_1d(self):
+        def test_cranberry():
+            A = Tensor(A_1d, requires_grad=True)
+            B = Tensor(A_1d, requires_grad=True)
+            out = A.matmul(B).sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, B.grad
+        def test_pytorch():
+            A = torch.tensor(A_1d, requires_grad=True)
+            B = torch.tensor(A_1d, requires_grad=True)
+            out = A.matmul(B).sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, B.grad
+        
+        for x, y in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol, atol)
+
+    def test_matmul_2d_2d(self):
         def test_cranberry():
             A = Tensor(A_np, requires_grad=True)
             C = Tensor(C_np, requires_grad=True)
-            out = A.matmul(C)
-            out = out.sum()
+            out = A.matmul(C).sum()
             out.backward()
             return out.detach().numpy(), A.grad, C.grad
         def test_pytorch():
             A = torch.tensor(A_np, requires_grad=True)
             C = torch.tensor(C_np, requires_grad=True)
-            out = A.matmul(C)
-            out = out.sum()
+            out = A.matmul(C).sum()
             out.backward()
             return out.detach().numpy(), A.grad, C.grad
         
         for x, y in zip(test_cranberry(), test_pytorch()):
             np.testing.assert_allclose(x, y, rtol, atol)
 
+    def test_matmul_1d_2d(self):
+        def test_cranberry():
+            A = Tensor(A_1d, requires_grad=True)
+            B = Tensor(B_np, requires_grad=True)
+            out = A.matmul(B).sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, B.grad
+        def test_pytorch():
+            A = torch.tensor(A_1d, requires_grad=True)
+            B = torch.tensor(B_np, requires_grad=True)
+            out = A.matmul(B).sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, B.grad
+        
+        for x, y in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol, atol)
+
+    def test_matmul_2d_1d(self):
+        def test_cranberry():
+            A = Tensor(A_np, requires_grad=True)
+            B = Tensor(B_1d, requires_grad=True)
+            out = A.matmul(B).sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, B.grad
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            B = torch.tensor(B_1d, requires_grad=True)
+            out = A.matmul(B).sum()
+            out.backward()
+            return out.detach().numpy(), A.grad, B.grad
+        
+        for x, y in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol, atol)
+
     # functional nn ops: linear, sparse_categorical_crossentropy
-    # TODO: linear, sparse_categorical_crossentropy
+
+    def test_linear(self):
+        def test_cranberry():
+            A = Tensor(A_np, requires_grad=True)
+            W = Tensor(C_np)
+            b = Tensor(E_np)
+            out = A.linear(W, b).sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            W = torch.tensor(C_np)
+            b = torch.tensor(E_np)
+            out = torch.nn.functional.linear(A, W.transpose(1, 0), b).sum() # transpose to match cranberry
+            out.backward()
+            return out.detach().numpy(), A.grad
+
+        for x, y in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol, atol)
+
+    # TODO: sparse_categorical_crossentropy
 
     # others
+    
     def test_backward_pass_0(self):
         def test_cranberry():
             A = Tensor(A_np, requires_grad=True)
