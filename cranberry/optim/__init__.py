@@ -1,16 +1,23 @@
 from cranberry import Tensor
 from typing import List
 
-# TODO: implement more detailed SGD
 class SGD:
     def __init__(self, params: List[Tensor], lr: float):
-        self.params, self.lr = params, lr
+        # if it's False, but being put into an optimizer, set it to True
+        for x in params:
+            if x._requires_grad is False: x._requires_grad = True
+        self._params, self._lr = params, lr
 
     def zero_grad(self):
-        for p in self.params: p.zero_grad()
+        for p in self._params: p._grad.fill(0.0)
 
     def step(self):
-        for p in self.params: p.step(self.lr)
+        for p in self._params: p._data -= self._lr * p._grad
+
+    @property
+    def lr(self): return self._lr
+    @lr.setter
+    def lr(self, lr: float): self._lr = lr
 
 # https://pytorch.org/docs/stable/generated/torch.optim.Adam.html
 # TODO: implement more detailed Adam

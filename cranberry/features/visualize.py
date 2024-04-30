@@ -13,7 +13,7 @@ def trace(root: Tensor):
     build(root)
     return nodes, edges
 
-def truncate(s: str, length=10): return s if len(s) <= length else s[:length] + '...'
+def truncate(s: str, length=20): return s if len(s) <= length else s[:length] + '...'
 
 def plot_graph(root: Tensor, format='svg', rankdir='LR'):
     """

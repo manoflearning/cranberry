@@ -13,9 +13,6 @@ class Linear:
     def __call__(self, x: Tensor) -> Tensor:
         return x.linear(weight=self.weight.transpose(0, 1), bias=self.bias)
 
-    def __str__(self):
-        return f"Linear(in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, bias={self.bias is not None})"        
-
     def parameters(self):
         return [self.weight, self.bias] if self.bias is not None else [self.weight]
 
@@ -23,11 +20,11 @@ class Sequential:
     def __init__(self, *layers: List[Callable[[Tensor], Tensor]]): self.layers = layers
 
     def __call__(self, x: Tensor) -> Tensor:
-        return [x := layer(x) for layer in self.layers][-1]
+        for layer in self.layers: x = layer(x)
+        return x
     
     def parameters(self):
         out = []
         for layer in self.layers:
-            if hasattr(layer, "parameters"):
-                out += layer.parameters()
+            if hasattr(layer, "parameters"): out += layer.parameters()
         return out

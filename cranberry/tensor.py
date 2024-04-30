@@ -35,7 +35,8 @@ class Tensor:
         else: raise ValueError(f"Invalid data type {type(data)}")
         
         # self._grad
-        self._grad = grad if grad is not None else np.zeros_like(self._data) # TODO: if requires_grad is False, then grad should be None
+        # TODO: if requires_grad is False, then grad should be None
+        self._grad: np.ndarray = grad if grad is not None else np.zeros_like(self._data)
 
         # self._shape
         if shape is not None: self._shape = shape
@@ -70,16 +71,12 @@ class Tensor:
             visited.add(t)
             if t._prev is not None:
                 for v in t._prev:
-                    if v not in visited: dfs(v)
+                    if v not in visited and v._requires_grad: dfs(v)
             topo.append(t)
         dfs(self)
 
         self._grad.fill(1.0)
-        for v in reversed(topo):
-            if v._requires_grad: v._backward()
-
-    def zero_grad(self): self._grad.fill(0.0)
-    def step(self, lr: float): self._data -= lr * self._grad
+        for v in reversed(topo): v._backward()
 
     # ********************************************************
     # ***************       broadcasting       ***************
@@ -312,7 +309,7 @@ class Tensor:
         return x.add(bias) if bias is not None else x
     
     def layer_norm(self, weight: Tensor, bias: Optional[Tensor], eps: float = 1e-5) -> Tensor: NotImplementedError
-    
+
     def dropout(self, p: float) -> Tensor: NotImplementedError
     
     def sparse_categorical_crossentropy(self, Y: Tensor) -> Tensor: NotImplementedError
@@ -376,6 +373,6 @@ class Tensor:
 
     def __hash__(self): return id(self)
     def __repr__(self): 
-        out = f"Tensor({self.numpy().round(4)}"
+        out = f"Tensor({self.numpy().round(4) if self._shape != () else self.item():.4f}"
         if self._op is not None: out += f", op={self._op.__repr__()}"
         return out + ")"
