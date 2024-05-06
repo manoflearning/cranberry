@@ -8,7 +8,7 @@ class BinaryOps(Enum):
     ADD = auto(); SUB = auto(); MUL = auto(); DIV = auto()
     def __repr__(self): return f"{self.name.lower()}"
 class ReduceOps(Enum):
-    SUM = auto()
+    SUM = auto(); MAX = auto()
     def __repr__(self): return f"{self.name.lower()}"
 class MovementOps(Enum):
     RESHAPE = auto(); EXPAND = auto(); PERMUTE = auto()

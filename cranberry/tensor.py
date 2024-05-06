@@ -198,9 +198,23 @@ class Tensor:
                 else: o_new_shape = ()
                 self._grad = self._grad + out._grad.reshape(o_new_shape)
             out._backward = backward
+        elif op == ReduceOps.MAX:
+            dim, keepdim = args
+            out._data = self._data.max(axis=dim, keepdims=keepdim)
+            out._grad = np.zeros_like(out._data)
+            out._shape = out._data.shape
+            def backward(): 
+                if dim is None or keepdim: self._grad += (self._data == out._data) * out._grad
+                else: 
+                    o_new_shape = tuple(1 if i == dim else s for i, s in enumerate(self.shape))
+                    self._grad += (self._data == out._data.reshape(o_new_shape)) * out._grad.reshape(o_new_shape)
+            out._backward = backward
         else: raise RuntimeError(f"Invalid reduce op {op}")
         return out
     def sum(self, dim: Optional[int] = None) -> Tensor: return self._reduce_op(dim, op=ReduceOps.SUM)
+    # different return types than pytorch
+    # https://pytorch.org/docs/stable/generated/torch.max.html
+    def max(self, dim: Optional[int] = None, keepdim = False) -> Tensor: return self._reduce_op(dim, keepdim, op=ReduceOps.MAX)
     def mean(self, dim: Optional[int] = None):
         out = self.sum(dim=dim)
         return out.div(prod(self.shape) / prod(out.shape))
@@ -373,6 +387,6 @@ class Tensor:
 
     def __hash__(self): return id(self)
     def __repr__(self): 
-        out = f"Tensor({self.numpy().round(4) if self._shape != () else self.item():.4f}"
+        out = f"Tensor({self.numpy().round(4) if self._shape != () else self.item()}"
         if self._op is not None: out += f", op={self._op.__repr__()}"
         return out + ")"
