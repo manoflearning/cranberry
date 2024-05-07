@@ -190,13 +190,15 @@ class Tensor:
     def _reduce_op(self, *args, op: ReduceOps) -> Tensor:
         out = Tensor._dummy(shape=(), requires_grad=self.requires_grad, prev=(self,), op=op)
         if op == ReduceOps.SUM:
-            out._data = self._data.sum(axis=args[0])    # TODO: remove this line
-            out._grad = np.zeros_like(out._data)        # TODO: remove this line
-            out._shape = out._data.shape                # TODO: remove this line
-            def backward(): # TODO: is this the best way to do this?
-                if args[0] is not None: o_new_shape = tuple(1 if i == args[0] else s for i, s in enumerate(self.shape))
-                else: o_new_shape = ()
-                self._grad = self._grad + out._grad.reshape(o_new_shape)
+            dim, keepdim = args
+            out._data = self._data.sum(axis=dim, keepdims=keepdim)
+            out._grad = np.zeros_like(out._data)
+            out._shape = out._data.shape
+            def backward():
+                if dim is None or keepdim: self._grad += out._grad
+                else:
+                    o_new_shape = tuple(1 if i == dim else s for i, s in enumerate(self.shape))
+                    self._grad += out._grad.reshape(o_new_shape)
             out._backward = backward
         elif op == ReduceOps.MAX:
             dim, keepdim = args
@@ -211,18 +213,30 @@ class Tensor:
             out._backward = backward
         else: raise RuntimeError(f"Invalid reduce op {op}")
         return out
-    def sum(self, dim: Optional[int] = None) -> Tensor: return self._reduce_op(dim, op=ReduceOps.SUM)
-    # different return types than pytorch
-    # https://pytorch.org/docs/stable/generated/torch.max.html
+    # TODO: add keepdim
+    def sum(self, dim: Optional[int] = None, keepdim = False) -> Tensor: return self._reduce_op(dim, keepdim, op=ReduceOps.SUM)
+    # different return types than pytorch: https://pytorch.org/docs/stable/generated/torch.max.html
     def max(self, dim: Optional[int] = None, keepdim = False) -> Tensor: return self._reduce_op(dim, keepdim, op=ReduceOps.MAX)
-    def mean(self, dim: Optional[int] = None):
-        out = self.sum(dim=dim)
+    def mean(self, dim: Optional[int] = None, keepdim = False):
+        out = self.sum(dim=dim, keepdim=keepdim)
         return out.div(prod(self.shape) / prod(out.shape))
+    
+    def _softmax(self, dim: int) -> Tuple[Tensor, Tensor, Tensor]:
+        if len(self.shape) == 0:
+            assert dim in [-1, 0], f"invalid dim {dim} for tensor {self}"
+            dim = None
+        m = self - self.max(dim=dim, keepdim=True) # it makes the softmax more numerically stable
+        e = m.exp()
+        return m, e, e.sum(dim=dim, keepdim=True)
+    def softmax(self, dim: int = -1) -> Tensor:
+        _, e, ss = self._softmax(dim)
+        return e.div(ss)
+    def log_softmax(self, dim: int = -1) -> Tensor: NotImplementedError
 
     # ********************************************************
     # ***************       movement ops       ***************
     # ********************************************************
-    
+
     def _movement_op(self, *args, op: MovementOps) -> Tensor:
         out = Tensor._dummy(shape=args[0], requires_grad=self.requires_grad, prev=(self,), op=op)
         if op == MovementOps.RESHAPE:

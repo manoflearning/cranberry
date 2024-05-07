@@ -218,7 +218,7 @@ class TestCranberry(unittest.TestCase):
         for x, y in zip(test_cranberry(), test_pytorch()):
             np.testing.assert_allclose(x, y, rtol, atol)
 
-    def test_sum_dim(self):
+    def test_sum_dim_0(self):
         def test_cranberry():
             A = Tensor(A_np, requires_grad=True)
             out = A.sum(dim=1)
@@ -228,6 +228,23 @@ class TestCranberry(unittest.TestCase):
         def test_pytorch():
             A = torch.tensor(A_np, requires_grad=True)
             out = A.sum(dim=1)
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        
+        for x, y in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol, atol)
+
+    def test_sum_dim_1(self):
+        def test_cranberry():
+            A = Tensor(A_np, requires_grad=True)
+            out = A.sum(dim=1, keepdim=True)
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            out = A.sum(dim=1, keepdim=True)
             out = out.sum()
             out.backward()
             return out.detach().numpy(), A.grad
@@ -250,7 +267,7 @@ class TestCranberry(unittest.TestCase):
         for x, y in zip(test_cranberry(), test_pytorch()):
             np.testing.assert_allclose(x, y, rtol, atol)
 
-    def test_max_dim(self):
+    def test_max_dim_0(self):
         def test_cranberry():
             A = Tensor(A_np, requires_grad=True)
             out = A.max(dim=1)
@@ -260,6 +277,22 @@ class TestCranberry(unittest.TestCase):
         def test_pytorch():
             A = torch.tensor(A_np, requires_grad=True)
             out = A.max(dim=1).values.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        
+        for x, y in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol, atol)
+
+    def test_max_dim_1(self):
+        def test_cranberry():
+            A = Tensor(A_np, requires_grad=True)
+            out = A.max(dim=1, keepdim=True)
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            out = A.max(dim=1, keepdim=True).values.sum()
             out.backward()
             return out.detach().numpy(), A.grad
         
