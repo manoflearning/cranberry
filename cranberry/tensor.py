@@ -231,7 +231,13 @@ class Tensor:
     def softmax(self, dim: int = -1) -> Tensor:
         _, e, ss = self._softmax(dim)
         return e.div(ss)
-    def log_softmax(self, dim: int = -1) -> Tensor: NotImplementedError
+    def log_softmax(self, dim: int = -1) -> Tensor:
+        # x.log_softmax()
+        # = x.softmax().log()
+        # = log(exp(x_i) / sum(exp(x_k)))
+        # = x_i - log(sum(exp(x_k)))
+        m, _, ss = self._softmax(dim)
+        return m - ss.log()
 
     # ********************************************************
     # ***************       movement ops       ***************

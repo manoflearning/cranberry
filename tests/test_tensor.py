@@ -201,7 +201,7 @@ class TestCranberry(unittest.TestCase):
         for x, y in zip(test_cranberry(), test_pytorch()):
             np.testing.assert_allclose(x, y, rtol, atol)
 
-    # reduce ops: sum, max, mean
+    # reduce ops: sum, max, mean, softmax, log_softmax
 
     def test_sum(self):
         def test_cranberry():
@@ -324,6 +324,74 @@ class TestCranberry(unittest.TestCase):
         def test_pytorch():
             A = torch.tensor(A_np, requires_grad=True)
             out = A.mean(dim=1)
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        
+        for x, y in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol, atol)
+
+    def test_softmax_0(self):
+        def test_cranberry():
+            A = Tensor(A_np, requires_grad=True)
+            out = A.softmax()
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            out = A.softmax(dim=-1)
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+
+        for x, y in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol, atol)
+
+    def test_softmax_1(self):
+        def test_cranberry():
+            A = Tensor(A_np, requires_grad=True)
+            out = A.softmax(dim=-2)
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            out = A.softmax(dim=-2)
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+
+        for x, y in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol, atol)
+
+    def test_log_softmax_0(self):
+        def test_cranberry():
+            A = Tensor(A_np, requires_grad=True)
+            out = A.log_softmax()
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            out = A.log_softmax(dim=-1)
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+
+        for x, y in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol, atol)
+
+    def test_log_softmax_1(self):
+        def test_cranberry():
+            A = Tensor(A_np, requires_grad=True)
+            out = A.log_softmax(dim=-2)
+            out = out.sum()
+            out.backward()
+            return out.detach().numpy(), A.grad
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            out = A.log_softmax(dim=-2)
             out = out.sum()
             out.backward()
             return out.detach().numpy(), A.grad
