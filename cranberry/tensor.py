@@ -346,7 +346,13 @@ class Tensor:
 
     def dropout(self, p: float) -> Tensor: NotImplementedError
     
-    def sparse_categorical_crossentropy(self, Y: Tensor) -> Tensor: NotImplementedError
+    def sparse_categorical_crossentropy(self, Y: Tensor) -> Tensor:
+        Y_pred = self.log_softmax()
+        # TODO: need more efficient implementation. currently, it's not possible to use Y as a tensor of indices
+        Y_onehot_data = np.zeros_like(Y_pred._data)
+        Y_onehot_data[np.arange(len(Y._data)), Y._data.astype(np.int32)] = 1
+        Y_onehot = Tensor(Y_onehot_data)
+        return -(Y_onehot * Y_pred).sum() / len(Y._data) # reduction="mean"
 
     # ********************************************************
     # ***************          random          ***************

@@ -9,6 +9,7 @@ torch.manual_seed(1337)
 
 N, M, K = 54, 29, 17 # do not change these values
 A_np = np.random.randn(N, M).astype(np.float32)
+Y_np = np.random.randint(0, 10, N)
 B_np = np.random.randn(N, M).astype(np.float32)
 C_np = np.random.randn(M, K).astype(np.float32)
 D_np = np.random.randn(1).astype(np.float32)
@@ -589,7 +590,22 @@ class TestCranberry(unittest.TestCase):
         for x, y in zip(test_cranberry(), test_pytorch()):
             np.testing.assert_allclose(x, y, rtol, atol)
 
-    # TODO: sparse_categorical_crossentropy
+    def test_sparse_categorical_crossentropy(self):
+        def test_cranberry():
+            A = Tensor(A_np, requires_grad=True)
+            Y = Tensor(Y_np)
+            out = A.sparse_categorical_crossentropy(Y)
+            out.backward()
+            return out.detach().numpy(), A.grad
+        def test_pytorch():
+            A = torch.tensor(A_np, requires_grad=True)
+            Y = torch.tensor(Y_np)
+            out = torch.nn.CrossEntropyLoss(reduction="mean")(A, Y)
+            out.backward()
+            return out.detach().numpy(), A.grad
+        
+        for x, y in zip(test_cranberry(), test_pytorch()):
+            np.testing.assert_allclose(x, y, rtol, atol)
 
     # others
     
