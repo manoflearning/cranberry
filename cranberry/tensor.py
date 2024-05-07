@@ -347,10 +347,13 @@ class Tensor:
     def dropout(self, p: float) -> Tensor: NotImplementedError
     
     def sparse_categorical_crossentropy(self, Y: Tensor) -> Tensor:
+        assert len(self.shape) == 2 and len(Y.shape) == 1, f"sparse_categorical_crossentropy only supports 2D tensor and 1D tensor, but got shapes {self.shape} and {Y.shape}"
+        assert self.shape[0] == Y.shape[0], f"sparse_categorical_crossentropy shape mismatch: {self.shape} and {Y.shape}"
+
         Y_pred = self.log_softmax()
         # TODO: need more efficient implementation. currently, it's not possible to use Y as a tensor of indices
         Y_onehot_data = np.zeros_like(Y_pred._data)
-        Y_onehot_data[np.arange(len(Y._data)), Y._data.astype(np.int32)] = 1
+        Y_onehot_data[np.arange(len(Y._data)), (Y._data + 1e-5).astype(np.int32)] = 1
         Y_onehot = Tensor(Y_onehot_data)
         return -(Y_onehot * Y_pred).sum() / len(Y._data) # reduction="mean"
 
