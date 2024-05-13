@@ -1,9 +1,7 @@
 # Cranberry
 
 <div align="center">
-
-<img src="cranberry.png" alt="profile" style="width:250px; height:auto; padding:12px">
-
+<img src="cranberry.png" alt="profile" style="width:50%; height:auto; padding:12px">
 </div>
 
 A one-person developing deep learning framework.
