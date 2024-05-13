@@ -1,5 +1,11 @@
 # Cranberry
 
+<div align="center">
+
+<img src="cranberry.png" alt="profile" style="width:250px; height:auto; padding:12px">
+
+</div>
+
 A one-person developing deep learning framework.
 Cranberry provides a PyTorch-like API, making it easy to learn and use.
 For now, it focuses on writing code that runs fast and stable on top of the CPU. 
