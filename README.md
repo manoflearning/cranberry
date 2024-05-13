@@ -1,8 +1,8 @@
+# Cranberry
+
 <div align="center">
 <img src="cranberry.png" alt="profile" style="width:40%; height:auto; padding:12px">
 </div>
-
-# Cranberry
 
 A one-person developing deep learning framework.
 Cranberry provides a PyTorch-like API, making it easy to learn and use.
