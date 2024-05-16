@@ -7,6 +7,8 @@ from cranberry.features.datasets import mnist
 X_train, Y_train, X_test, Y_test = mnist()
 X_train, X_test = X_train.flatten(1), X_test.flatten(1)
 
+print(X_train.shape, Y_train.shape, X_test.shape, Y_test.shape)
+
 model = nn.Sequential(
     nn.Linear(784, 128), Tensor.relu,
     nn.Linear(128, 64), Tensor.relu,
