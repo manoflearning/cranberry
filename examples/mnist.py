@@ -13,7 +13,7 @@ model = nn.Sequential(
     nn.Linear(64, 10)
 )
 
-optimizer = optim.SGD(model.parameters(), lr=0.001) # TODO: use Adam
+optimizer = optim.SGD(model.parameters(), lr=0.001)  # TODO: use Adam
 
 for i in range(100):
     optimizer.zero_grad()

@@ -1,11 +1,12 @@
+import time
+import numpy as np
+from cranberry import Tensor
 import os
 os.environ['OMP_NUM_THREADS'] = '1'
 
-from cranberry import Tensor
-import numpy as np
-import time
 
 N = 1024
+
 
 def gemm_numpy():
     A = np.random.rand(N, N).astype(np.float32)
@@ -16,6 +17,7 @@ def gemm_numpy():
     s_np = et - st
     return s_np
 
+
 def gemm_cranberry():
     A = Tensor.randn(N, N)
     B = Tensor.randn(N, N)
@@ -24,6 +26,7 @@ def gemm_cranberry():
     et = time.monotonic()
     s_cr = et - st
     return s_cr
+
 
 if __name__ == '__main__':
     flop = N*N*2*N
