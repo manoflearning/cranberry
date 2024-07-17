@@ -1,5 +1,3 @@
-name: Lint Code with autopep8
-
 on:
     push:
         branches:
