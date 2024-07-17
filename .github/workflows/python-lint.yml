@@ -26,4 +26,5 @@ jobs:
 
           - name: Run autopep8
             run: |
-              autopep8 --diff --exit-code .
+                find . -type f -name "*.py" | xargs autopep8 --diff --exit-code
+        
