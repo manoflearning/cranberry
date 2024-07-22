@@ -28,7 +28,7 @@ jobs:
 
           - name: Run tests
             run: |
-                python -m unittest discover -s tests
+                python -m unittest discover -s tests -v
                 
           - name: Cache pip dependencies
             uses: actions/cache@v2
