@@ -1,10 +1,29 @@
+from abc import abstractmethod
 from cranberry import Tensor
 
 import math
-from typing import List, Callable
+from typing import List
 
 
-class Linear:
+class Module:
+    @abstractmethod
+    def __call__(self, x: Tensor) -> Tensor:
+        pass
+
+    @abstractmethod
+    def parameters(self) -> List[Tensor]:
+        pass
+
+
+class ReLU(Module):
+    def __call__(self, x: Tensor) -> Tensor:
+        return x.relu()
+
+    def parameters(self) -> List[Tensor]:
+        return []
+
+
+class Linear(Module):
     # https://github.com/tinygrad/tinygrad/blob/master/tinygrad/nn/__init__.py#L72-L80
     def __init__(self, in_features: int, out_features: int, bias=True):
         self.weight = Tensor.kaiming_uniform(out_features, in_features, a=math.sqrt(5))
@@ -16,12 +35,12 @@ class Linear:
     def __call__(self, x: Tensor) -> Tensor:
         return x.linear(weight=self.weight.transpose(0, 1), bias=self.bias)
 
-    def parameters(self):
+    def parameters(self) -> List[Tensor]:
         return [self.weight, self.bias] if self.bias is not None else [self.weight]
 
 
-class Sequential:
-    def __init__(self, *layers: List[Callable[[Tensor], Tensor]]):
+class Sequential(Module):
+    def __init__(self, *layers: Module):
         self.layers = layers
 
     def __call__(self, x: Tensor) -> Tensor:
@@ -29,9 +48,8 @@ class Sequential:
             x = layer(x)
         return x
 
-    def parameters(self):
+    def parameters(self) -> List[Tensor]:
         out = []
         for layer in self.layers:
-            if hasattr(layer, "parameters"):
-                out += layer.parameters()
+            out += layer.parameters()
         return out
