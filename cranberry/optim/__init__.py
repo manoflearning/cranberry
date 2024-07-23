@@ -19,9 +19,13 @@ class SGD:
             p._data -= self._lr * p._grad
 
     @property
-    def lr(self): return self._lr
+    def lr(self):
+        return self._lr
+
     @lr.setter
-    def lr(self, lr: float): self._lr = lr
+    def lr(self, lr: float):
+        self._lr = lr
+
 
 # https://pytorch.org/docs/stable/generated/torch.optim.Adam.html
 # TODO: implement more detailed Adam

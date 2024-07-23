@@ -1,1 +1,1 @@
-from cranberry.tensor import Tensor
+from cranberry.tensor import Tensor as Tensor

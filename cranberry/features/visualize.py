@@ -12,22 +12,23 @@ def trace(root: Tensor):
                 for child in v._prev:
                     edges.add((child, v))
                     build(child)
+
     build(root)
     return nodes, edges
 
 
-def truncate(s: str, length=20): return s if len(
-    s) <= length else s[:length] + '...'
+def truncate(s: str, length=20):
+    return s if len(s) <= length else s[:length] + "..."
 
 
-def plot_graph(root: Tensor, format='svg', rankdir='LR'):
+def plot_graph(root: Tensor, format="svg", rankdir="LR"):
     """
     format: png | svg | ...
     rankdir: TB (top to bottom graph) | LR (left to right)
     """
-    assert rankdir in ['LR', 'TB']
+    assert rankdir in ["LR", "TB"]
     nodes, edges = trace(root)
-    dot = Digraph(format=format, graph_attr={'rankdir': rankdir})
+    dot = Digraph(format=format, graph_attr={"rankdir": rankdir})
 
     for n in nodes:
         label = f"data = {truncate(str(n.data.round(2)))}"
@@ -36,7 +37,7 @@ def plot_graph(root: Tensor, format='svg', rankdir='LR'):
         # if n.shape: label += f"|shape = {n.shape}"
         if n.op is not None:
             label += f"|op = {n.op.__repr__()}"
-        dot.node(name=str(n.__hash__()), label=label, shape='record')
+        dot.node(name=str(n.__hash__()), label=label, shape="record")
     for n1, n2 in edges:
         dot.edge(str(n1.__hash__()), str(n2.__hash__()))
 
