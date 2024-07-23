@@ -8,7 +8,9 @@ class UnaryOps(Enum):
     RELU = auto()
     EXP = auto()
     LOG = auto()
-    def __repr__(self): return f"{self.name.lower()}"
+
+    def __repr__(self):
+        return f"{self.name.lower()}"
 
 
 class BinaryOps(Enum):
@@ -16,20 +18,26 @@ class BinaryOps(Enum):
     SUB = auto()
     MUL = auto()
     DIV = auto()
-    def __repr__(self): return f"{self.name.lower()}"
+
+    def __repr__(self):
+        return f"{self.name.lower()}"
 
 
 class ReduceOps(Enum):
     SUM = auto()
     MAX = auto()
-    def __repr__(self): return f"{self.name.lower()}"
+
+    def __repr__(self):
+        return f"{self.name.lower()}"
 
 
 class MovementOps(Enum):
     RESHAPE = auto()
     EXPAND = auto()
     PERMUTE = auto()
-    def __repr__(self): return f"{self.name.lower()}"
+
+    def __repr__(self):
+        return f"{self.name.lower()}"
 
 
 Op = Union[UnaryOps, BinaryOps, ReduceOps, MovementOps, None]

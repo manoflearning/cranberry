@@ -616,8 +616,9 @@ class TestCranberry(unittest.TestCase):
             A = torch.tensor(A_np, requires_grad=True)
             W = torch.tensor(C_np)
             b = torch.tensor(E_np)
-            out = torch.nn.functional.linear(A, W.transpose(
-                1, 0), b).sum()  # transpose to match cranberry
+            out = torch.nn.functional.linear(
+                A, W.transpose(1, 0), b
+            ).sum()  # transpose to match cranberry
             out.backward()
             return out.detach().numpy(), A.grad
 
@@ -695,5 +696,5 @@ class TestCranberry(unittest.TestCase):
             np.testing.assert_allclose(x, y, rtol, atol)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
