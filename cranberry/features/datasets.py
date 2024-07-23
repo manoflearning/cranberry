@@ -31,7 +31,7 @@ def fetch(
         / "cranberry"
         / "downloads"
         / (name if name else hashlib.md5(url.encode("utf-8")).hexdigest())
-    )  # noqa: E501
+    )
     if not fp.is_file() or not allow_caching:
         with urllib.request.urlopen(url, timeout=10) as r:
             assert r.status == 200
