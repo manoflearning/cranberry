@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "cranberry"
-version = "0.0.1"
+version = "0.1.1"
 authors = ["Wookyung Jeong <77jwk0724@gmail.com>"]
 readme = "README.md"
 description = "yet another deep learning framework"
@@ -12,6 +12,9 @@ description = "yet another deep learning framework"
 [tool.poetry.dependencies]
 python = "~3.11"
 numpy = "^2.0"
+graphviz = "^0.20.3"
+psutil = "^6.0.0"
+tqdm = "^4.66.4"
 
 [tool.poetry.group.dev.dependencies]
 pyright = "^1.1.372"

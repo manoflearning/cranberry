@@ -31,3 +31,7 @@ jobs:
             run: |
                 poetry run ruff check .
                 poetry run ruff format .
+
+          - name: Pyright
+            run: |
+                poetry run pyright

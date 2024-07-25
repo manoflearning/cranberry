@@ -5,6 +5,7 @@ import time
 from typing import List, Optional, Tuple, Union
 import numpy as np
 from math import prod
+from cranberry.shape import Shape
 
 
 def flatten_list(list: List) -> List:
@@ -17,12 +18,12 @@ def flatten_list(list: List) -> List:
     return flat
 
 
-def shape_for_list(list: List) -> Tuple[int]:
+def shape_for_list(list: List) -> Shape:
     shape = []
     while isinstance(list, List):
         shape.append(len(list))
         list = list[0]
-    return tuple(shape)
+    return Shape(tuple(shape))
 
 
 class Tensor:
@@ -31,9 +32,9 @@ class Tensor:
         data: Union[float, int, List, np.ndarray, np.float32],
         grad: Optional[np.ndarray] = None,
         # TODO: remove shape, and replace with View
-        shape: Optional[Tuple[int]] = None,
+        shape: Optional[Union[Tuple, Shape]] = None,
         requires_grad: bool = False,
-        prev: Optional[Tuple[Tensor]] = None,
+        prev: Optional[Tuple[Tensor, ...]] = None,
         op: Optional[Op] = None,
     ):  # TODO: dtype, device
         # self._data
@@ -41,8 +42,10 @@ class Tensor:
             self._data = np.array(data, dtype=np.float32)
         elif isinstance(data, List):
             self._data = np.array(data, dtype=np.float32)
-        elif isinstance(data, (np.ndarray, np.float32)):
+        elif isinstance(data, np.ndarray):
             self._data = data.astype(np.float32)
+        elif type(data) is np.float32:
+            self._data = np.array(data, dtype=np.float32)
         else:
             raise ValueError(f"Invalid data type {type(data)}")
 
@@ -52,21 +55,26 @@ class Tensor:
 
         # self._shape
         if shape is not None:
-            self._shape = shape
+            if isinstance(shape, Shape):
+                self._shape = shape
+            elif isinstance(shape, Tuple):
+                self._shape = Shape(shape)
         elif isinstance(data, (float, int)):
-            self._shape = ()
+            self._shape = Shape(())
         elif isinstance(data, List):
             self._shape = shape_for_list(data)
-        elif isinstance(data, (np.ndarray, np.float32)):
-            self._shape = data.shape
+        elif isinstance(data, np.ndarray):
+            self._shape = Shape(data.shape)
+        elif type(data) is np.float32:
+            self._shape = Shape(data.shape)
         else:
             raise ValueError(f"Invalid data type {type(data)}")
 
-        assert (
-            self._shape == self._data.shape
+        assert self._shape == Shape(
+            self._data.shape
         ), f"shape {self._shape} must match data shape {self._data.shape}"
-        assert (
-            self._shape == self._grad.shape
+        assert self._shape == Shape(
+            self._grad.shape
         ), f"shape {self._shape} must match grad shape {self._grad.shape}"
 
         # self._requires_grad
@@ -74,7 +82,7 @@ class Tensor:
         # self._backward
         self._backward = lambda: None
         # self._prev
-        self._prev: Optional[Tuple[Tensor]] = prev
+        self._prev: Optional[Tuple[Tensor, ...]] = prev
         # self._op
         self._op = op
 
@@ -112,15 +120,15 @@ class Tensor:
     # ********************************************************
 
     def _broadcasted(self, other: Tensor) -> Tuple[Tensor, Tensor]:
-        shape1, shape2 = self._shape, other._shape
+        shape1, shape2 = self.shape, other.shape
         while len(shape1) < len(shape2):
             shape1 = (1,) + shape1
         while len(shape2) < len(shape1):
             shape2 = (1,) + shape2
         shape = tuple(max(s1, s2) for s1, s2 in zip(shape1, shape2))
-        if self._shape != shape:
+        if self.shape != shape:
             self = self.expand(*shape)
-        if other._shape != shape:
+        if other.shape != shape:
             other = other.expand(*shape)
         return self, other
 
@@ -199,7 +207,11 @@ class Tensor:
     # TODO: gelu sanity check
 
     def gelu(self) -> Tensor:
-        0.5 * self * (1 + (self * 0.7978845608 * (1 + 0.044715 * self * self)).tanh())
+        return (
+            0.5
+            * self
+            * (1 + (self * 0.7978845608 * (1 + 0.044715 * self * self)).tanh())
+        )
 
     # ********************************************************
     # ***************        binary ops        ***************
@@ -300,13 +312,13 @@ class Tensor:
 
     def _reduce_op(self, *args, op: ReduceOps) -> Tensor:
         out = Tensor._dummy(
-            shape=(), requires_grad=self.requires_grad, prev=(self,), op=op
+            shape=Shape(()), requires_grad=self.requires_grad, prev=(self,), op=op
         )
         if op == ReduceOps.SUM:
             dim, keepdim = args
             out._data = self._data.sum(axis=dim, keepdims=keepdim)
             out._grad = np.zeros_like(out._data)
-            out._shape = out._data.shape
+            out._shape = Shape(out._data.shape) if isinstance(out._data, np.ndarray) else Shape(())
 
             def backward():
                 if dim is None or keepdim:
@@ -322,7 +334,7 @@ class Tensor:
             dim, keepdim = args
             out._data = self._data.max(axis=dim, keepdims=keepdim)
             out._grad = np.zeros_like(out._data)
-            out._shape = out._data.shape
+            out._shape = Shape(out._data.shape) if isinstance(out._data, np.ndarray) else Shape(())
 
             def backward():
                 if dim is None or keepdim:
@@ -354,7 +366,7 @@ class Tensor:
         out = self.sum(dim=dim, keepdim=keepdim)
         return out.div(prod(self.shape) / prod(out.shape))
 
-    def _softmax(self, dim: int) -> Tuple[Tensor, Tensor, Tensor]:
+    def _softmax(self, dim: Optional[int]) -> Tuple[Tensor, Tensor, Tensor]:
         if len(self.shape) == 0:
             assert dim in [-1, 0], f"invalid dim {dim} for tensor {self}"
             dim = None
@@ -381,7 +393,7 @@ class Tensor:
 
     def _movement_op(self, *args, op: MovementOps) -> Tensor:
         out = Tensor._dummy(
-            shape=args[0], requires_grad=self.requires_grad, prev=(self,), op=op
+            shape=Shape(args[0]), requires_grad=self.requires_grad, prev=(self,), op=op
         )
         if op == MovementOps.RESHAPE:
             out._data = self._data.reshape(args[0])
@@ -523,7 +535,7 @@ class Tensor:
             raise RuntimeError(f"Invalid matmul shapes {self.shape} and {other.shape}")
 
     def dot(self, other: Tensor) -> Tensor:
-        self.matmul(other)
+        return self.matmul(other)
 
     def __matmul__(self, other: Tensor) -> Tensor:
         return self.matmul(other)
@@ -536,14 +548,6 @@ class Tensor:
         x = self.matmul(weight)
         return x.add(bias) if bias is not None else x
 
-    def layer_norm(
-        self, weight: Tensor, bias: Optional[Tensor], eps: float = 1e-5
-    ) -> Tensor:
-        NotImplementedError
-
-    def dropout(self, p: float) -> Tensor:
-        NotImplementedError
-
     def sparse_categorical_crossentropy(self, Y: Tensor) -> Tensor:
         assert (
             len(self.shape) == 2 and len(Y.shape) == 1
@@ -555,9 +559,11 @@ class Tensor:
         Y_pred = self.log_softmax()
         # TODO: need more efficient implementation. currently, it's not possible to use Y as a tensor of indices
         Y_onehot_data = np.zeros_like(Y_pred._data)
-        Y_onehot_data[np.arange(len(Y._data)), (Y._data + 1e-5).astype(np.int32)] = 1
+        Y_onehot_data[
+            np.arange(prod(Y._data.shape)), (Y._data + 1e-5).astype(np.int32)
+        ] = 1
         Y_onehot = Tensor(Y_onehot_data)
-        return -(Y_onehot * Y_pred).sum() / len(Y._data)  # reduction="mean"
+        return -(Y_onehot * Y_pred).sum() / prod(Y._data.shape)  # reduction="mean"
 
     # ********************************************************
     # ***************          random          ***************
@@ -575,7 +581,7 @@ class Tensor:
         return Tensor._seed
 
     @staticmethod
-    def randn(*shape: int, requires_grad: bool = False) -> Tensor:
+    def randn(shape: Tuple[int, ...], requires_grad: bool = False) -> Tensor:
         np.random.seed(Tensor._nxt_seed())
         return Tensor(
             data=np.random.randn(*shape),
@@ -586,7 +592,9 @@ class Tensor:
         )
 
     @staticmethod
-    def uniform(*shape: int, low=0.0, high=1.0) -> Tensor:
+    def uniform(shape: Union[Tuple[int, ...], int], low=0.0, high=1.0) -> Tensor:
+        if isinstance(shape, int):
+            shape = (shape,)
         np.random.seed(Tensor._nxt_seed())
         return Tensor(
             data=np.random.uniform(low, high, prod(shape)).reshape(shape),
@@ -597,11 +605,13 @@ class Tensor:
         )
 
     @staticmethod
-    def kaiming_uniform(*shape: int, a: float = 0.01) -> Tensor:
+    def kaiming_uniform(shape: Union[Tuple[int, ...], int], a: float = 0.01) -> Tensor:
+        if isinstance(shape, int):
+            shape = (shape,)
         bound = (
             math.sqrt(3.0) * math.sqrt(2.0 / (1 + a**2)) / math.sqrt(prod(shape[1:]))
         )
-        return Tensor.uniform(*shape, low=-bound, high=bound)
+        return Tensor.uniform(shape, low=-bound, high=bound)
 
     # ********************************************************
     # ***************      helper functions    ***************
@@ -609,10 +619,10 @@ class Tensor:
 
     @staticmethod
     def _dummy(
-        shape: Tuple[int], requires_grad: bool, prev: Optional[Tuple[Tensor]], op: Op
-    ):
+        shape: Shape, requires_grad: bool, prev: Optional[Tuple[Tensor, ...]], op: Op
+    ) -> Tensor:
         return Tensor(
-            data=np.zeros(shape),
+            data=np.zeros(shape.dims),
             shape=shape,
             requires_grad=requires_grad,
             prev=prev,
@@ -620,7 +630,7 @@ class Tensor:
         )
 
     @staticmethod
-    def zeros(*shape: int, requires_grad: bool = False) -> Tensor:
+    def zeros(shape: Tuple[int], requires_grad: bool = False) -> Tensor:
         return Tensor(
             data=np.zeros(shape),
             shape=shape,
@@ -630,7 +640,7 @@ class Tensor:
         )
 
     @staticmethod
-    def ones(*shape: int, requires_grad: bool = False) -> Tensor:
+    def ones(shape: Tuple[int], requires_grad: bool = False) -> Tensor:
         return Tensor(
             data=np.ones(shape),
             shape=shape,
@@ -656,8 +666,8 @@ class Tensor:
         return self._grad
 
     @property
-    def shape(self) -> Tuple[int]:
-        return self._shape
+    def shape(self) -> Tuple:
+        return self._shape.dims
 
     @property
     def requires_grad(self) -> bool:
