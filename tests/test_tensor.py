@@ -138,6 +138,7 @@ class TestCranberry(unittest.TestCase):
             A = torch.tensor(A_np, requires_grad=True)
             out = A.sigmoid()
             out = out.sum()
+            out.backward()
             assert A.grad is not None
             return out.detach().numpy(), A.grad.detach().numpy()
 
@@ -415,6 +416,7 @@ class TestCranberry(unittest.TestCase):
             A = torch.tensor(A_np, requires_grad=True)
             out = A.softmax(dim=-2)
             out = out.sum()
+            out.backward()
             assert A.grad is not None
             return out.detach().numpy(), A.grad.detach().numpy()
 
