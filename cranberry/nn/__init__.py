@@ -26,7 +26,9 @@ class ReLU(Module):
 class Linear(Module):
     # https://github.com/tinygrad/tinygrad/blob/master/tinygrad/nn/__init__.py#L72-L80
     def __init__(self, in_features: int, out_features: int, bias=True):
-        self.weight = Tensor.kaiming_uniform(out_features, in_features, a=math.sqrt(5))
+        self.weight = Tensor.kaiming_uniform(
+            shape=(out_features, in_features), a=math.sqrt(5)
+        )
         bound = 1 / math.sqrt(in_features)
         self.bias = (
             Tensor.uniform(out_features, low=-bound, high=bound) if bias else None
