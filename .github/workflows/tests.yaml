@@ -19,17 +19,7 @@ jobs:
           - name: Set up Python
             uses: actions/setup-python@v2
             with:
-                python-version: '3.11'
-
-          - name: Cache Poetry dependencies
-            uses: actions/cache@v2
-            with:
-              path: |
-                ~/.cache/pypoetry
-                ~/.virtualenvs
-              key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
-              restore-keys: |
-                ${{ runner.os }}-poetry-
+                python-version: 3.11
 
           - name: Install dependencies
             run: |
