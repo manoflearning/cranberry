@@ -32,7 +32,7 @@ impl Storage {
         assert!(0 < self.ref_count);
         self.ref_count -= 1;
         if self.ref_count == 0 {
-            // You might wonder why we manually drop the memory here, 
+            // You might wonder why we manually drop the memory here,
             // instead of letting the Rust compiler handle it.
             // The reason is that this is the library code binding to the Python interpreter.
             // The Rust compiler does not know when the Python interpreter will release the memory.
@@ -45,15 +45,23 @@ impl Storage {
 
 fn storage_relu(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
     cpu_backend::unary_ops::relu(
-        a.storage_getitem(idx_a, size), 
+        a.storage_getitem(idx_a, size),
         b.storage_getitem_mut(idx_b, size),
     );
 }
 
-fn storage_add(a: &Storage, b: &Storage, c: &mut Storage, idx_a: usize, idx_b: usize, idx_c: usize, size: usize) {
+fn storage_add(
+    a: &Storage,
+    b: &Storage,
+    c: &mut Storage,
+    idx_a: usize,
+    idx_b: usize,
+    idx_c: usize,
+    size: usize,
+) {
     cpu_backend::binary_ops::add(
-        a.storage_getitem(idx_a, size), 
-        b.storage_getitem(idx_b, size), 
+        a.storage_getitem(idx_a, size),
+        b.storage_getitem(idx_b, size),
         c.storage_getitem_mut(idx_c, size),
     );
 }
