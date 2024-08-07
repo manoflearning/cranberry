@@ -23,9 +23,6 @@ maturin = "^1.7.0"
 requires = ["maturin>=0.13"]
 build-backend = "maturin"
 
-[tool.maturin]
-python-source = "cranberry"
-
 [project]
 name = "cranberry"
 version = "0.1.1"
