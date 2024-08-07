@@ -1,13 +1,9 @@
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
-
 [tool.poetry]
 name = "cranberry"
 version = "0.1.1"
 authors = ["Wookyung Jeong <77jwk0724@gmail.com>"]
 readme = "README.md"
-description = "yet another deep learning framework"
+description = ""
 
 [tool.poetry.dependencies]
 python = "~3.11"
@@ -15,10 +11,27 @@ numpy = "^2.0"
 graphviz = "^0.20.3"
 psutil = "^6.0.0"
 tqdm = "^4.66.4"
-maturin = "^1.7.0"
 
 [tool.poetry.group.dev.dependencies]
 pyright = "^1.1.372"
 ruff = "^0.5.4"
 pytest = "^8.3.1"
 torch = "^2.3.1"
+maturin = "^1.7.0"
+
+[build-system]
+requires = ["maturin>=0.13"]
+build-backend = "maturin"
+
+[project]
+name = "cranberry"
+version = "0.1.1"
+description = ""
+authors = [ {name = "Wookyung Jeong", email = "77jwk0724@gmail.com"} ]
+requires-python = "~=3.11"
+license = { file = "LICENSE" }
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
