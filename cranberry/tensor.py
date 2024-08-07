@@ -7,7 +7,6 @@ import numpy as np
 from math import prod
 from cranberry.shape import Shape
 
-
 def flatten_list(list: List) -> List:
     flat = []
     for item in list:
