@@ -1,10 +1,8 @@
 mod cpu_backend;
-
 mod device;
-
 use device::Device;
 
-struct Storage {
+pub struct Storage {
     data: Vec<f32>,
     data_size: usize,
     device: Device,
@@ -12,19 +10,19 @@ struct Storage {
 }
 
 impl Storage {
-    fn zeros(size: usize, device: Device) -> Storage {
+    pub fn new(value: f32, size: usize, device: Device) -> Storage {
         Storage {
-            data: vec![0.0; size],
+            data: vec![value; size],
             data_size: size,
             device,
             ref_count: 1,
         }
     }
-    fn incref(&mut self) {
+    pub fn incref(&mut self) {
         assert!(0 < self.ref_count);
         self.ref_count += 1;
     }
-    fn decref(&mut self) {
+    pub fn decref(&mut self) {
         assert!(0 < self.ref_count);
         self.ref_count -= 1;
         if self.ref_count == 0 {
@@ -51,7 +49,7 @@ fn storage_getitems_mut(a: &mut Storage, idx: usize, size: usize) -> &mut [f32] 
     a.data[idx..idx + size].as_mut()
 }
 
-fn storage_relu(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
+pub fn storage_relu(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
     assert!(a.device == b.device);
     match a.device {
         Device::Cpu => cpu_backend::unary_ops::relu(
@@ -63,7 +61,7 @@ fn storage_relu(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: 
     }
 }
 
-fn storage_add(
+pub fn storage_add(
     a: &Storage,
     b: &Storage,
     c: &mut Storage,
@@ -86,10 +84,10 @@ fn storage_add(
 
 #[pyo3::pymodule]
 mod cranberry {
+    use crate::device::Device;
+    use crate::Storage;
     use pyo3::prelude::*;
     use uuid::Uuid;
-
-    use crate::{device::Device, Storage};
 
     #[pyclass]
     #[derive(PartialEq)]
@@ -99,17 +97,14 @@ mod cranberry {
     }
 
     impl StoragePtr {
-        fn from_storage(storage: &Storage) -> StoragePtr {
-            StoragePtr {
-                ptr: format!("{:p}", storage as *const _),
-                uuid: Uuid::new_v4().to_string(),
-            }
-        }
-        fn from_ptr(ptr: String) -> StoragePtr {
+        fn new(ptr: String) -> StoragePtr {
             StoragePtr {
                 ptr,
                 uuid: Uuid::new_v4().to_string(),
             }
+        }
+        fn from_storage(storage: &Storage) -> StoragePtr {
+            StoragePtr::new(format!("{:p}", storage as *const _))
         }
         fn get_storage(&self) -> &Storage {
             unsafe { &*(self.ptr.parse::<usize>().unwrap() as *const Storage) }
@@ -120,28 +115,28 @@ mod cranberry {
     }
 
     #[pyfunction]
-    fn zeros(size: usize, device: &str) -> StoragePtr {
-        StoragePtr::from_storage(&Storage::zeros(size, Device::from_str(device)))
+    fn storage_full(fill_value: f32, size: usize, device: &str) -> StoragePtr {
+        StoragePtr::from_storage(&Storage::new(fill_value, size, Device::from_str(device)))
     }
 
     #[pyfunction]
-    fn clone(storage_ptr: &mut StoragePtr) -> StoragePtr {
+    fn storage_clone(storage_ptr: &mut StoragePtr) -> StoragePtr {
         storage_ptr.get_storage_mut().incref();
-        StoragePtr::from_ptr(storage_ptr.ptr.clone())
+        StoragePtr::new(storage_ptr.ptr.clone())
     }
     #[pyfunction]
-    fn drop(storage_ptr: &mut StoragePtr) {
+    fn storage_drop(storage_ptr: &mut StoragePtr) {
         storage_ptr.get_storage_mut().decref();
         storage_ptr.ptr.clear();
     }
 
     #[pyfunction]
-    fn relu(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
+    fn storage_relu(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
         crate::storage_relu(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
     }
 
     #[pyfunction]
-    fn add(
+    fn storage_add(
         a: &StoragePtr,
         b: &StoragePtr,
         c: &mut StoragePtr,
