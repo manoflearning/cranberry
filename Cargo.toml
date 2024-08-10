@@ -1,7 +1,11 @@
 [package]
-name = "storage"
+name = "cranberry"
 version = "0.1.1"
 edition = "2021"
+
+[lib]
+name = "storage"
+crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "^0.22.2", features = ["extension-module"] }

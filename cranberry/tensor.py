@@ -7,6 +7,7 @@ import numpy as np
 from math import prod
 from cranberry.shape import Shape
 
+
 def flatten_list(list: List) -> List:
     flat = []
     for item in list:
@@ -317,7 +318,11 @@ class Tensor:
             dim, keepdim = args
             out._data = self._data.sum(axis=dim, keepdims=keepdim)
             out._grad = np.zeros_like(out._data)
-            out._shape = Shape(out._data.shape) if isinstance(out._data, np.ndarray) else Shape(())
+            out._shape = (
+                Shape(out._data.shape)
+                if isinstance(out._data, np.ndarray)
+                else Shape(())
+            )
 
             def backward():
                 if dim is None or keepdim:
@@ -333,7 +338,11 @@ class Tensor:
             dim, keepdim = args
             out._data = self._data.max(axis=dim, keepdims=keepdim)
             out._grad = np.zeros_like(out._data)
-            out._shape = Shape(out._data.shape) if isinstance(out._data, np.ndarray) else Shape(())
+            out._shape = (
+                Shape(out._data.shape)
+                if isinstance(out._data, np.ndarray)
+                else Shape(())
+            )
 
             def backward():
                 if dim is None or keepdim:
