@@ -83,7 +83,7 @@ pub fn storage_add(
 }
 
 #[pyo3::pymodule]
-mod cranberry {
+mod storage {
     use crate::device::Device;
     use crate::Storage;
     use pyo3::prelude::*;
