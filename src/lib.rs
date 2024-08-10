@@ -1,5 +1,5 @@
-mod cpu_backend;
 mod device;
+mod ops;
 use device::Device;
 
 pub struct Storage {
@@ -47,39 +47,6 @@ fn storage_getitems_mut(a: &mut Storage, idx: usize, size: usize) -> &mut [f32] 
     assert!(0 < size);
     assert!(idx + size <= a.data_size);
     a.data[idx..idx + size].as_mut()
-}
-
-pub fn storage_relu(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
-    assert!(a.device == b.device);
-    match a.device {
-        Device::Cpu => cpu_backend::unary_ops::relu(
-            storage_getitems(a, idx_a, size),
-            storage_getitems_mut(b, idx_b, size),
-        ),
-        Device::Metal => unimplemented!(),
-        Device::Cuda => unimplemented!(),
-    }
-}
-
-pub fn storage_add(
-    a: &Storage,
-    b: &Storage,
-    c: &mut Storage,
-    idx_a: usize,
-    idx_b: usize,
-    idx_c: usize,
-    size: usize,
-) {
-    assert!(a.device == b.device && b.device == c.device);
-    match a.device {
-        Device::Cpu => cpu_backend::binary_ops::add(
-            storage_getitems(a, idx_a, size),
-            storage_getitems(b, idx_b, size),
-            storage_getitems_mut(c, idx_c, size),
-        ),
-        Device::Metal => unimplemented!(),
-        Device::Cuda => unimplemented!(),
-    }
 }
 
 #[pyo3::pymodule]
@@ -131,8 +98,24 @@ mod storage {
     }
 
     #[pyfunction]
+    fn storage_neg(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
+        crate::ops::storage_neg(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
+    }
+    #[pyfunction]
+    fn storage_sqrt(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
+        crate::ops::storage_sqrt(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size)
+    }
+    #[pyfunction]
     fn storage_relu(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
-        crate::storage_relu(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
+        crate::ops::storage_relu(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
+    }
+    #[pyfunction]
+    fn storage_exp(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
+        crate::ops::storage_exp(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
+    }
+    #[pyfunction]
+    fn storage_log(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
+        crate::ops::storage_log(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
     }
 
     #[pyfunction]
@@ -145,7 +128,67 @@ mod storage {
         idx_c: usize,
         size: usize,
     ) {
-        crate::storage_add(
+        crate::ops::storage_add(
+            a.get_storage(),
+            b.get_storage(),
+            c.get_storage_mut(),
+            idx_a,
+            idx_b,
+            idx_c,
+            size,
+        );
+    }
+    #[pyfunction]
+    fn storage_sub(
+        a: &StoragePtr,
+        b: &StoragePtr,
+        c: &mut StoragePtr,
+        idx_a: usize,
+        idx_b: usize,
+        idx_c: usize,
+        size: usize,
+    ) {
+        crate::ops::storage_sub(
+            a.get_storage(),
+            b.get_storage(),
+            c.get_storage_mut(),
+            idx_a,
+            idx_b,
+            idx_c,
+            size,
+        );
+    }
+    #[pyfunction]
+    fn storage_mul(
+        a: &StoragePtr,
+        b: &StoragePtr,
+        c: &mut StoragePtr,
+        idx_a: usize,
+        idx_b: usize,
+        idx_c: usize,
+        size: usize,
+    ) {
+        crate::ops::storage_mul(
+            a.get_storage(),
+            b.get_storage(),
+            c.get_storage_mut(),
+            idx_a,
+            idx_b,
+            idx_c,
+            size,
+        );
+    }
+    #[pyfunction]
+    fn storage_div(
+        a: &StoragePtr,
+        b: &StoragePtr,
+        c: &mut StoragePtr,
+        idx_a: usize,
+        idx_b: usize,
+        idx_c: usize,
+        size: usize,
+    ) {
+        crate::ops::storage_div(
             a.get_storage(),
             b.get_storage(),
             c.get_storage_mut(),
