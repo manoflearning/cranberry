@@ -55,7 +55,7 @@ pub mod binary_ops {
     }
     pub fn sub(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
-        
+
         a.array_chunks::<64>()
             .map(|a| f32x64::from_array(*a))
             .zip(b.array_chunks::<64>().map(|b| f32x64::from_array(*b)))
@@ -75,7 +75,7 @@ pub mod binary_ops {
     }
     pub fn mul(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
-        
+
         a.array_chunks::<64>()
             .map(|a| f32x64::from_array(*a))
             .zip(b.array_chunks::<64>().map(|b| f32x64::from_array(*b)))
@@ -95,7 +95,7 @@ pub mod binary_ops {
     }
     pub fn div(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
-        
+
         a.array_chunks::<64>()
             .map(|a| f32x64::from_array(*a))
             .zip(b.array_chunks::<64>().map(|b| f32x64::from_array(*b)))
