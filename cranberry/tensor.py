@@ -8,16 +8,6 @@ from math import prod
 from cranberry.shape import Shape
 
 
-def flatten_list(list: List) -> List:
-    flat = []
-    for item in list:
-        if isinstance(item, List):
-            flat.extend(flatten_list(item))
-        else:
-            flat.append(item)
-    return flat
-
-
 def shape_for_list(list: List) -> Shape:
     shape = []
     while isinstance(list, List):
