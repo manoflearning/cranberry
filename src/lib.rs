@@ -1,3 +1,6 @@
+#![feature(portable_simd)]
+#![feature(array_chunks)]
+
 mod device;
 mod ops;
 use device::Device;
@@ -10,7 +13,7 @@ pub struct Storage {
 }
 
 impl Storage {
-    pub fn new(value: f32, size: usize, device: Device) -> Storage {
+    pub fn new(value: f32, size: usize, device: Device) -> Self {
         Storage {
             data: vec![value; size],
             data_size: size,
