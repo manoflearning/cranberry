@@ -32,19 +32,19 @@ pub mod unary_ops {
 }
 
 pub mod binary_ops {
-    use std::simd::f32x64;
+    use std::simd::f32x4;
     pub fn add(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
 
-        a.array_chunks::<64>()
-            .map(|a| f32x64::from_array(*a))
-            .zip(b.array_chunks::<64>().map(|b| f32x64::from_array(*b)))
-            .zip(c.array_chunks_mut::<64>().map(|c| f32x64::from_array(*c)))
+        a.array_chunks::<4>()
+            .map(|a| f32x4::from_array(*a))
+            .zip(b.array_chunks::<4>().map(|b| f32x4::from_array(*b)))
+            .zip(c.array_chunks_mut::<4>().map(|c| f32x4::from_array(*c)))
             .for_each(|((a, b), mut _c)| {
                 _c = a + b;
             });
 
-        let remain = a.len() - a.len() % 64;
+        let remain = a.len() - a.len() % 4;
         a[remain..]
             .iter()
             .zip(&b[remain..])
@@ -56,15 +56,15 @@ pub mod binary_ops {
     pub fn sub(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
 
-        a.array_chunks::<64>()
-            .map(|a| f32x64::from_array(*a))
-            .zip(b.array_chunks::<64>().map(|b| f32x64::from_array(*b)))
-            .zip(c.array_chunks_mut::<64>().map(|c| f32x64::from_array(*c)))
+        a.array_chunks::<4>()
+            .map(|a| f32x4::from_array(*a))
+            .zip(b.array_chunks::<4>().map(|b| f32x4::from_array(*b)))
+            .zip(c.array_chunks_mut::<4>().map(|c| f32x4::from_array(*c)))
             .for_each(|((a, b), mut _c)| {
                 _c = a - b;
             });
 
-        let remain = a.len() - a.len() % 64;
+        let remain = a.len() - a.len() % 4;
         a[remain..]
             .iter()
             .zip(&b[remain..])
@@ -76,15 +76,15 @@ pub mod binary_ops {
     pub fn mul(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
 
-        a.array_chunks::<64>()
-            .map(|a| f32x64::from_array(*a))
-            .zip(b.array_chunks::<64>().map(|b| f32x64::from_array(*b)))
-            .zip(c.array_chunks_mut::<64>().map(|c| f32x64::from_array(*c)))
+        a.array_chunks::<4>()
+            .map(|a| f32x4::from_array(*a))
+            .zip(b.array_chunks::<4>().map(|b| f32x4::from_array(*b)))
+            .zip(c.array_chunks_mut::<4>().map(|c| f32x4::from_array(*c)))
             .for_each(|((a, b), mut _c)| {
                 _c = a * b;
             });
 
-        let remain = a.len() - a.len() % 64;
+        let remain = a.len() - a.len() % 4;
         a[remain..]
             .iter()
             .zip(&b[remain..])
@@ -96,15 +96,15 @@ pub mod binary_ops {
     pub fn div(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
 
-        a.array_chunks::<64>()
-            .map(|a| f32x64::from_array(*a))
-            .zip(b.array_chunks::<64>().map(|b| f32x64::from_array(*b)))
-            .zip(c.array_chunks_mut::<64>().map(|c| f32x64::from_array(*c)))
+        a.array_chunks::<4>()
+            .map(|a| f32x4::from_array(*a))
+            .zip(b.array_chunks::<4>().map(|b| f32x4::from_array(*b)))
+            .zip(c.array_chunks_mut::<4>().map(|c| f32x4::from_array(*c)))
             .for_each(|((a, b), mut _c)| {
                 _c = a / b;
             });
 
-        let remain = a.len() - a.len() % 64;
+        let remain = a.len() - a.len() % 4;
         a[remain..]
             .iter()
             .zip(&b[remain..])
