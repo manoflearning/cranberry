@@ -141,3 +141,27 @@ pub fn storage_div(
         Device::Cuda => unimplemented!(),
     }
 }
+
+pub fn storage_sum(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
+    assert!(a.device == b.device);
+    match a.device {
+        Device::Cpu => cpu_backend::reduce_ops::sum(
+            storage_getitems(a, idx_a, size),
+            storage_getitems_mut(b, idx_b, 1),
+        ),
+        Device::Metal => unimplemented!(),
+        Device::Cuda => unimplemented!(),
+    }
+}
+
+pub fn storage_max(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
+    assert!(a.device == b.device);
+    match a.device {
+        Device::Cpu => cpu_backend::reduce_ops::max(
+            storage_getitems(a, idx_a, size),
+            storage_getitems_mut(b, idx_b, 1),
+        ),
+        Device::Metal => unimplemented!(),
+        Device::Cuda => unimplemented!(),
+    }
+}

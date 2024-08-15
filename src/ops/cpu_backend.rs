@@ -204,3 +204,39 @@ pub mod binary_ops {
             });
     }
 }
+
+pub mod reduce_ops {
+    use std::simd::num::SimdFloat;
+
+    use super::*;
+    pub fn sum(a: &[f32], b: &mut [f32]) {
+        assert!(b.len() == 1);
+
+        let mut sum = f32x64::splat(0.0);
+
+        a.array_chunks::<CHUNK_SIZE>()
+            .map(|a| f32x64::from_array(*a))
+            .for_each(|a| {
+                sum += a;
+            });
+        b[0] = sum.reduce_sum();
+
+        let remain = a.len() - a.len() % CHUNK_SIZE;
+        b[0] += a[remain..].iter().sum::<f32>();
+    }
+    pub fn max(a: &[f32], b: &mut [f32]) {
+        assert!(b.len() == 1);
+
+        let mut max = f32x64::splat(f32::NEG_INFINITY);
+
+        a.array_chunks::<CHUNK_SIZE>()
+            .map(|a| f32x64::from_array(*a))
+            .for_each(|a| {
+                max = if a > max { a } else { max };
+            });
+        b[0] = max.reduce_max();
+
+        let remain = a.len() - a.len() % CHUNK_SIZE;
+        b[0] = a[remain..].iter().copied().fold(b[0], f32::max);
+    }
+}

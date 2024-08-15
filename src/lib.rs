@@ -201,4 +201,13 @@ mod storage {
             size,
         );
     }
+
+    #[pyfunction]
+    fn storage_sum(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
+        crate::ops::storage_sum(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
+    }
+    #[pyfunction]
+    fn storage_max(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
+        crate::ops::storage_max(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
+    }
 }
