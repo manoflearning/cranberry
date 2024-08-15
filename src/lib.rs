@@ -5,7 +5,7 @@ mod device;
 mod ops;
 use device::Device;
 
-pub struct Storage {
+pub(crate) struct Storage {
     data: Vec<f32>,
     data_size: usize,
     device: Device,
@@ -13,7 +13,7 @@ pub struct Storage {
 }
 
 impl Storage {
-    pub fn new(value: f32, size: usize, device: Device) -> Self {
+    pub(crate) fn new(value: f32, size: usize, device: Device) -> Self {
         Storage {
             data: vec![value; size],
             data_size: size,
@@ -21,11 +21,11 @@ impl Storage {
             ref_count: 1,
         }
     }
-    pub fn incref(&mut self) {
+    pub(crate) fn incref(&mut self) {
         assert!(0 < self.ref_count);
         self.ref_count += 1;
     }
-    pub fn decref(&mut self) {
+    pub(crate) fn decref(&mut self) {
         assert!(0 < self.ref_count);
         self.ref_count -= 1;
         if self.ref_count == 0 {
@@ -38,12 +38,12 @@ impl Storage {
             self.data.shrink_to_fit();
         }
     }
-    pub fn get_items(&self, idx: usize, size: usize) -> &[f32] {
+    pub(crate) fn get_items(&self, idx: usize, size: usize) -> &[f32] {
         assert!(0 < size);
         assert!(idx + size <= self.data_size);
         self.data[idx..idx + size].as_ref()
     }
-    pub fn get_items_mut(&mut self, idx: usize, size: usize) -> &mut [f32] {
+    pub(crate) fn get_items_mut(&mut self, idx: usize, size: usize) -> &mut [f32] {
         assert!(0 < size);
         assert!(idx + size <= self.data_size);
         self.data[idx..idx + size].as_mut()
@@ -51,15 +51,16 @@ impl Storage {
 }
 
 #[pyo3::pymodule]
-mod storage {
+pub mod storage {
     use crate::device::Device;
+    use crate::ops;
     use crate::Storage;
     use pyo3::prelude::*;
     use uuid::Uuid;
 
     #[pyclass]
     #[derive(PartialEq)]
-    struct StoragePtr {
+    pub struct StoragePtr {
         ptr: String,
         uuid: String,
     }
@@ -83,44 +84,74 @@ mod storage {
     }
 
     #[pyfunction]
-    fn storage_full(fill_value: f32, size: usize, device: &str) -> StoragePtr {
+    pub fn storage_full(fill_value: f32, size: usize, device: &str) -> StoragePtr {
         StoragePtr::from_storage(&Storage::new(fill_value, size, Device::from_str(device)))
     }
 
     #[pyfunction]
-    fn storage_clone(storage_ptr: &mut StoragePtr) -> StoragePtr {
+    pub fn storage_clone(storage_ptr: &mut StoragePtr) -> StoragePtr {
         storage_ptr.get_storage_mut().incref();
         StoragePtr::new(storage_ptr.ptr.clone())
     }
     #[pyfunction]
-    fn storage_drop(storage_ptr: &mut StoragePtr) {
+    pub fn storage_drop(storage_ptr: &mut StoragePtr) {
         storage_ptr.get_storage_mut().decref();
         storage_ptr.ptr.clear();
     }
 
     #[pyfunction]
-    fn storage_neg(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
-        crate::ops::storage_neg(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
+    pub fn storage_neg(
+        a: &StoragePtr,
+        b: &mut StoragePtr,
+        idx_a: usize,
+        idx_b: usize,
+        size: usize,
+    ) {
+        ops::neg(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
     }
     #[pyfunction]
-    fn storage_sqrt(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
-        crate::ops::storage_sqrt(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size)
+    pub fn storage_sqrt(
+        a: &StoragePtr,
+        b: &mut StoragePtr,
+        idx_a: usize,
+        idx_b: usize,
+        size: usize,
+    ) {
+        ops::sqrt(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size)
     }
     #[pyfunction]
-    fn storage_relu(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
-        crate::ops::storage_relu(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
+    pub fn storage_relu(
+        a: &StoragePtr,
+        b: &mut StoragePtr,
+        idx_a: usize,
+        idx_b: usize,
+        size: usize,
+    ) {
+        ops::relu(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
     }
     #[pyfunction]
-    fn storage_exp(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
-        crate::ops::storage_exp(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
+    pub fn storage_exp(
+        a: &StoragePtr,
+        b: &mut StoragePtr,
+        idx_a: usize,
+        idx_b: usize,
+        size: usize,
+    ) {
+        ops::exp(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
     }
     #[pyfunction]
-    fn storage_log(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
-        crate::ops::storage_log(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
+    pub fn storage_log(
+        a: &StoragePtr,
+        b: &mut StoragePtr,
+        idx_a: usize,
+        idx_b: usize,
+        size: usize,
+    ) {
+        ops::log(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
     }
 
     #[pyfunction]
-    fn storage_add(
+    pub fn storage_add(
         a: &StoragePtr,
         b: &StoragePtr,
         c: &mut StoragePtr,
@@ -129,7 +160,7 @@ mod storage {
         idx_c: usize,
         size: usize,
     ) {
-        crate::ops::storage_add(
+        ops::add(
             a.get_storage(),
             b.get_storage(),
             c.get_storage_mut(),
@@ -140,7 +171,7 @@ mod storage {
         );
     }
     #[pyfunction]
-    fn storage_sub(
+    pub fn storage_sub(
         a: &StoragePtr,
         b: &StoragePtr,
         c: &mut StoragePtr,
@@ -149,7 +180,7 @@ mod storage {
         idx_c: usize,
         size: usize,
     ) {
-        crate::ops::storage_sub(
+        ops::sub(
             a.get_storage(),
             b.get_storage(),
             c.get_storage_mut(),
@@ -160,7 +191,7 @@ mod storage {
         );
     }
     #[pyfunction]
-    fn storage_mul(
+    pub fn storage_mul(
         a: &StoragePtr,
         b: &StoragePtr,
         c: &mut StoragePtr,
@@ -169,7 +200,7 @@ mod storage {
         idx_c: usize,
         size: usize,
     ) {
-        crate::ops::storage_mul(
+        ops::mul(
             a.get_storage(),
             b.get_storage(),
             c.get_storage_mut(),
@@ -180,7 +211,7 @@ mod storage {
         );
     }
     #[pyfunction]
-    fn storage_div(
+    pub fn storage_div(
         a: &StoragePtr,
         b: &StoragePtr,
         c: &mut StoragePtr,
@@ -189,7 +220,7 @@ mod storage {
         idx_c: usize,
         size: usize,
     ) {
-        crate::ops::storage_div(
+        ops::div(
             a.get_storage(),
             b.get_storage(),
             c.get_storage_mut(),
@@ -201,11 +232,23 @@ mod storage {
     }
 
     #[pyfunction]
-    fn storage_sum(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
-        crate::ops::storage_sum(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
+    pub fn storage_sum(
+        a: &StoragePtr,
+        b: &mut StoragePtr,
+        idx_a: usize,
+        idx_b: usize,
+        size: usize,
+    ) {
+        ops::sum(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
     }
     #[pyfunction]
-    fn storage_max(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
-        crate::ops::storage_max(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
+    pub fn storage_max(
+        a: &StoragePtr,
+        b: &mut StoragePtr,
+        idx_a: usize,
+        idx_b: usize,
+        size: usize,
+    ) {
+        ops::max(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
     }
 }

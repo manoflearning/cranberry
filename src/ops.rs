@@ -2,7 +2,7 @@ use crate::{device::Device, Storage};
 
 mod cpu_backend;
 
-pub fn storage_neg(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
+pub fn neg(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
     assert!(a.device == b.device);
     match a.device {
         Device::Cpu => {
@@ -12,7 +12,7 @@ pub fn storage_neg(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, siz
         Device::Cuda => unimplemented!(),
     }
 }
-pub fn storage_sqrt(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
+pub fn sqrt(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
     assert!(a.device == b.device);
     match a.device {
         Device::Cpu => {
@@ -22,7 +22,7 @@ pub fn storage_sqrt(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, si
         Device::Cuda => unimplemented!(),
     }
 }
-pub fn storage_relu(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
+pub fn relu(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
     assert!(a.device == b.device);
     match a.device {
         Device::Cpu => {
@@ -32,7 +32,7 @@ pub fn storage_relu(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, si
         Device::Cuda => unimplemented!(),
     }
 }
-pub fn storage_exp(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
+pub fn exp(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
     assert!(a.device == b.device);
     match a.device {
         Device::Cpu => {
@@ -42,7 +42,7 @@ pub fn storage_exp(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, siz
         Device::Cuda => unimplemented!(),
     }
 }
-pub fn storage_log(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
+pub fn log(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
     assert!(a.device == b.device);
     match a.device {
         Device::Cpu => {
@@ -53,7 +53,7 @@ pub fn storage_log(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, siz
     }
 }
 
-pub fn storage_add(
+pub fn add(
     a: &Storage,
     b: &Storage,
     c: &mut Storage,
@@ -74,7 +74,7 @@ pub fn storage_add(
     }
 }
 
-pub fn storage_sub(
+pub fn sub(
     a: &Storage,
     b: &Storage,
     c: &mut Storage,
@@ -95,7 +95,7 @@ pub fn storage_sub(
     }
 }
 
-pub fn storage_mul(
+pub fn mul(
     a: &Storage,
     b: &Storage,
     c: &mut Storage,
@@ -116,7 +116,7 @@ pub fn storage_mul(
     }
 }
 
-pub fn storage_div(
+pub fn div(
     a: &Storage,
     b: &Storage,
     c: &mut Storage,
@@ -137,7 +137,7 @@ pub fn storage_div(
     }
 }
 
-pub fn storage_sum(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
+pub fn sum(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
     assert!(a.device == b.device);
     match a.device {
         Device::Cpu => {
@@ -148,7 +148,7 @@ pub fn storage_sum(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, siz
     }
 }
 
-pub fn storage_max(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
+pub fn max(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
     assert!(a.device == b.device);
     match a.device {
         Device::Cpu => {
