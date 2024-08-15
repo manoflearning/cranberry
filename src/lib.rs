@@ -38,18 +38,16 @@ impl Storage {
             self.data.shrink_to_fit();
         }
     }
-}
-
-fn storage_getitems(a: &Storage, idx: usize, size: usize) -> &[f32] {
-    assert!(0 < size);
-    assert!(idx + size <= a.data_size);
-    a.data[idx..idx + size].as_ref()
-}
-
-fn storage_getitems_mut(a: &mut Storage, idx: usize, size: usize) -> &mut [f32] {
-    assert!(0 < size);
-    assert!(idx + size <= a.data_size);
-    a.data[idx..idx + size].as_mut()
+    pub fn get_items(&self, idx: usize, size: usize) -> &[f32] {
+        assert!(0 < size);
+        assert!(idx + size <= self.data_size);
+        self.data[idx..idx + size].as_ref()
+    }
+    pub fn get_items_mut(&mut self, idx: usize, size: usize) -> &mut [f32] {
+        assert!(0 < size);
+        assert!(idx + size <= self.data_size);
+        self.data[idx..idx + size].as_mut()
+    }
 }
 
 #[pyo3::pymodule]
