@@ -17,3 +17,4 @@ rustflags = ["-C", "target-cpu=native"]
 [dependencies]
 pyo3 = { version = "^0.22.2", features = ["extension-module"] }
 uuid = { version = "^1.10.0", features = [ "v4", "fast-rng", "macro-diagnostics"] }
+rand = { version = "0.8.5" }

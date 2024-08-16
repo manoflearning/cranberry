@@ -25,6 +25,7 @@ name = "cranberry"
 version = "0.1.1"
 dependencies = [
  "pyo3",
+ "rand",
  "uuid",
 ]
 

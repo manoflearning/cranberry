@@ -4,14 +4,14 @@
 mod device;
 mod storage;
 pub mod storage_ptr;
-use storage_ptr::StoragePtr;
 
 use pyo3::prelude::*;
 
 #[pyo3::pymodule]
 fn cranberry(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<StoragePtr>()?;
+    m.add_class::<storage_ptr::StoragePtr>()?;
     m.add_function(wrap_pyfunction!(storage_ptr::storage_full, m)?)?;
+    m.add_function(wrap_pyfunction!(storage_ptr::storage_full_vec, m)?)?;
     m.add_function(wrap_pyfunction!(storage_ptr::storage_clone, m)?)?;
     m.add_function(wrap_pyfunction!(storage_ptr::storage_drop, m)?)?;
     m.add_function(wrap_pyfunction!(storage_ptr::storage_neg, m)?)?;
