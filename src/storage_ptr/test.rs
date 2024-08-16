@@ -1,9 +1,7 @@
 #[cfg(test)]
 mod test_storage {
-    use std::ops::Neg;
-
     use crate::storage_ptr::{
-        storage_full, storage_full_vec, storage_neg, storage_relu, storage_sqrt
+        storage_full, storage_full_vec, storage_neg, storage_relu, storage_sqrt,
     };
     use rand::random;
 
@@ -71,5 +69,4 @@ mod test_storage {
     fn test_storage_max() {
         todo!()
     }
-
 }
