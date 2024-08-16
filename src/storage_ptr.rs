@@ -1,3 +1,4 @@
+mod test;
 use uuid::Uuid;
 
 use crate::{device::Device, storage::Storage};
@@ -17,19 +18,25 @@ impl StoragePtr {
         }
     }
     fn from_storage(storage: &Storage) -> StoragePtr {
-        StoragePtr::new(format!("{:p}", storage as *const _))
+        StoragePtr::new(format!("{:x}", storage as *const _ as usize))
     }
     fn get_storage(&self) -> &Storage {
-        unsafe { &*(self.ptr.parse::<usize>().unwrap() as *const Storage) }
+        let address = usize::from_str_radix(&self.ptr, 16).unwrap();
+        unsafe { &*(address as *const Storage) }
     }
     fn get_storage_mut(&mut self) -> &mut Storage {
-        unsafe { &mut *(self.ptr.parse::<usize>().unwrap() as *mut Storage) }
+        let address = usize::from_str_radix(&self.ptr, 16).unwrap();
+        unsafe { &mut *(address as *mut Storage) }
     }
 }
 
 #[pyo3::pyfunction]
 pub fn storage_full(fill_value: f32, size: usize, device: &str) -> StoragePtr {
     StoragePtr::from_storage(&Storage::new(fill_value, size, Device::from_str(device)))
+}
+#[pyo3::pyfunction]
+pub fn storage_full_vec(fill_vec: Vec<f32>, device: &str) -> StoragePtr {
+    StoragePtr::from_storage(&Storage::from_vec(fill_vec, Device::from_str(device)))
 }
 #[pyo3::pyfunction]
 pub fn storage_clone(storage_ptr: &mut StoragePtr) -> StoragePtr {

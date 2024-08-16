@@ -17,6 +17,14 @@ impl Storage {
             ref_count: 1,
         }
     }
+    pub fn from_vec(vec: Vec<f32>, device: Device) -> Self {
+        Storage {
+            data_size: vec.len(),
+            data: vec,
+            device,
+            ref_count: 1,
+        }
+    }
     pub fn device(&self) -> Device {
         self.device.clone()
     }
