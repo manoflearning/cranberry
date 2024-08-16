@@ -4,6 +4,7 @@ const CHUNK_SIZE: usize = 64;
 
 pub mod unary_ops {
     use super::*;
+    #[inline(always)]
     pub fn neg(a: &[f32], b: &mut [f32]) {
         assert!(a.len() == b.len());
 
@@ -22,6 +23,7 @@ pub mod unary_ops {
             *b = -a;
         });
     }
+    #[inline(always)]
     pub fn sqrt(a: &[f32], b: &mut [f32]) {
         assert!(a.len() == b.len());
 
@@ -40,6 +42,7 @@ pub mod unary_ops {
             *b = a.sqrt();
         });
     }
+    #[inline(always)]
     pub fn relu(a: &[f32], b: &mut [f32]) {
         assert!(a.len() == b.len());
 
@@ -59,6 +62,7 @@ pub mod unary_ops {
             *b = if *a > 0.0 { *a } else { 0.0 };
         });
     }
+    #[inline(always)]
     pub fn exp(a: &[f32], b: &mut [f32]) {
         assert!(a.len() == b.len());
 
@@ -77,6 +81,7 @@ pub mod unary_ops {
             *b = a.exp();
         });
     }
+    #[inline(always)]
     pub fn log(a: &[f32], b: &mut [f32]) {
         assert!(a.len() == b.len());
 
@@ -99,6 +104,7 @@ pub mod unary_ops {
 
 pub mod binary_ops {
     use super::*;
+    #[inline(always)]
     pub fn add(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
 
@@ -125,6 +131,7 @@ pub mod binary_ops {
                 *c = a + b;
             });
     }
+    #[inline(always)]
     pub fn sub(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
 
@@ -151,6 +158,7 @@ pub mod binary_ops {
                 *c = a - b;
             });
     }
+    #[inline(always)]
     pub fn mul(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
 
@@ -177,6 +185,7 @@ pub mod binary_ops {
                 *c = a * b;
             });
     }
+    #[inline(always)]
     pub fn div(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
 
@@ -206,9 +215,9 @@ pub mod binary_ops {
 }
 
 pub mod reduce_ops {
-    use std::simd::num::SimdFloat;
-
     use super::*;
+    use std::simd::num::SimdFloat;
+    #[inline(always)]
     pub fn sum(a: &[f32], b: &mut [f32]) {
         assert!(b.len() == 1);
 
@@ -224,6 +233,7 @@ pub mod reduce_ops {
         let remain = a.len() - a.len() % CHUNK_SIZE;
         b[0] += a[remain..].iter().sum::<f32>();
     }
+    #[inline(always)]
     pub fn max(a: &[f32], b: &mut [f32]) {
         assert!(b.len() == 1);
 

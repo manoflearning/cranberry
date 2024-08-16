@@ -50,57 +50,62 @@ impl Storage {
 }
 
 impl Storage {
+    #[inline(always)]
     pub fn neg(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
         assert!(a.device() == b.device());
         match a.device() {
             Device::Cpu => {
                 cpu_backend::unary_ops::neg(a.get_items(idx_a, size), b.get_items_mut(idx_b, size))
             }
-            Device::Metal => unimplemented!(),
-            Device::Cuda => unimplemented!(),
+            Device::Metal => todo!(),
+            Device::Cuda => todo!(),
         }
     }
+    #[inline(always)]
     pub fn sqrt(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
         assert!(a.device() == b.device());
         match a.device() {
             Device::Cpu => {
                 cpu_backend::unary_ops::sqrt(a.get_items(idx_a, size), b.get_items_mut(idx_b, size))
             }
-            Device::Metal => unimplemented!(),
-            Device::Cuda => unimplemented!(),
+            Device::Metal => todo!(),
+            Device::Cuda => todo!(),
         }
     }
+    #[inline(always)]
     pub fn relu(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
         assert!(a.device() == b.device());
         match a.device() {
             Device::Cpu => {
                 cpu_backend::unary_ops::relu(a.get_items(idx_a, size), b.get_items_mut(idx_b, size))
             }
-            Device::Metal => unimplemented!(),
-            Device::Cuda => unimplemented!(),
+            Device::Metal => todo!(),
+            Device::Cuda => todo!(),
         }
     }
+    #[inline(always)]
     pub fn exp(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
         assert!(a.device() == b.device());
         match a.device() {
             Device::Cpu => {
                 cpu_backend::unary_ops::exp(a.get_items(idx_a, size), b.get_items_mut(idx_b, size))
             }
-            Device::Metal => unimplemented!(),
-            Device::Cuda => unimplemented!(),
+            Device::Metal => todo!(),
+            Device::Cuda => todo!(),
         }
     }
+    #[inline(always)]
     pub fn log(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
         assert!(a.device() == b.device());
         match a.device() {
             Device::Cpu => {
                 cpu_backend::unary_ops::log(a.get_items(idx_a, size), b.get_items_mut(idx_b, size))
             }
-            Device::Metal => unimplemented!(),
-            Device::Cuda => unimplemented!(),
+            Device::Metal => todo!(),
+            Device::Cuda => todo!(),
         }
     }
-
+    #[inline(always)]
     pub fn add(
         a: &Storage,
         b: &Storage,
@@ -117,11 +122,11 @@ impl Storage {
                 b.get_items(idx_b, size),
                 c.get_items_mut(idx_c, size),
             ),
-            Device::Metal => unimplemented!(),
-            Device::Cuda => unimplemented!(),
+            Device::Metal => todo!(),
+            Device::Cuda => todo!(),
         }
     }
-
+    #[inline(always)]
     pub fn sub(
         a: &Storage,
         b: &Storage,
@@ -138,11 +143,11 @@ impl Storage {
                 b.get_items(idx_b, size),
                 c.get_items_mut(idx_c, size),
             ),
-            Device::Metal => unimplemented!(),
-            Device::Cuda => unimplemented!(),
+            Device::Metal => todo!(),
+            Device::Cuda => todo!(),
         }
     }
-
+    #[inline(always)]
     pub fn mul(
         a: &Storage,
         b: &Storage,
@@ -159,11 +164,11 @@ impl Storage {
                 b.get_items(idx_b, size),
                 c.get_items_mut(idx_c, size),
             ),
-            Device::Metal => unimplemented!(),
-            Device::Cuda => unimplemented!(),
+            Device::Metal => todo!(),
+            Device::Cuda => todo!(),
         }
     }
-
+    #[inline(always)]
     pub fn div(
         a: &Storage,
         b: &Storage,
@@ -180,30 +185,30 @@ impl Storage {
                 b.get_items(idx_b, size),
                 c.get_items_mut(idx_c, size),
             ),
-            Device::Metal => unimplemented!(),
-            Device::Cuda => unimplemented!(),
+            Device::Metal => todo!(),
+            Device::Cuda => todo!(),
         }
     }
-
+    #[inline(always)]
     pub fn sum(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
         assert!(a.device() == b.device());
         match a.device() {
             Device::Cpu => {
                 cpu_backend::reduce_ops::sum(a.get_items(idx_a, size), b.get_items_mut(idx_b, 1))
             }
-            Device::Metal => unimplemented!(),
-            Device::Cuda => unimplemented!(),
+            Device::Metal => todo!(),
+            Device::Cuda => todo!(),
         }
     }
-
+    #[inline(always)]
     pub fn max(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
         assert!(a.device() == b.device());
         match a.device() {
             Device::Cpu => {
                 cpu_backend::reduce_ops::max(a.get_items(idx_a, size), b.get_items_mut(idx_b, 1))
             }
-            Device::Metal => unimplemented!(),
-            Device::Cuda => unimplemented!(),
+            Device::Metal => todo!(),
+            Device::Cuda => todo!(),
         }
     }
 }
