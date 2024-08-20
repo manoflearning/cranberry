@@ -11,7 +11,6 @@ name: Rust CI
 jobs:
   ci:
     runs-on: ubuntu-latest
-    # Keep this the same as this is what Github looks for to determine if the build passed
     name: "Pass"
     needs:
       - check_style
