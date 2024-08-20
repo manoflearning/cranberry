@@ -29,10 +29,12 @@ impl Storage {
             ref_count: 1,
         }
     }
+    #[inline(always)]
     pub fn incref(&mut self) {
         assert!(0 < self.ref_count);
         self.ref_count += 1;
     }
+    #[inline(always)]
     pub fn decref(&mut self) {
         assert!(0 < self.ref_count);
         self.ref_count -= 1;
