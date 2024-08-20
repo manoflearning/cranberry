@@ -19,7 +19,7 @@ jobs:
       - test_python
     steps:
       - run: exit 0
-  
+
   check_style_rust:
     name: Check file formatting and style (Rust)
     runs-on: ubuntu-latest
@@ -51,7 +51,7 @@ jobs:
         run: cargo test --workspace --all-features
   
   check_style_python:
-    name: Check file formatting and style
+    name: Check file formatting and style (Python)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,7 +75,7 @@ jobs:
           poetry run pyright
     
   test_python:
-    name: Tests
+    name: Tests (Python)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
