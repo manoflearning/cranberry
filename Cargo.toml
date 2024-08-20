@@ -4,17 +4,19 @@ version = "0.1.1"
 edition = "2021"
 
 [lib]
+name = "cranberry"
 crate-type = ["cdylib"]
 
-[profile.release]
-opt-level = 3
-codegen-units = 1
-lto = true
-
-[build]
-rustflags = ["-C", "target-cpu=native"]
+[features]
+abi3 = ["pyo3/abi3-py37", "generate-import-lib"]
+generate-import-lib = ["pyo3/generate-import-lib"]
 
 [dependencies]
 pyo3 = { version = "^0.22.2", features = ["extension-module"] }
 uuid = { version = "^1.10.0", features = [ "v4", "fast-rng", "macro-diagnostics"] }
 rand = { version = "0.8.5" }
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = true
