@@ -14,8 +14,8 @@ jobs:
     name: Pass
     needs:
       - check_style_rust
-      - test_rust
       - check_style_python
+      - test_rust
       - test_python
     steps:
       - run: exit 0
@@ -36,19 +36,6 @@ jobs:
   
       - name: Run clippy
         run: cargo clippy --workspace --all-features
-
-  test_rust:
-    name: Tests (Rust)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          toolchain: nightly
-  
-      - name: Run tests
-        run: cargo test --workspace --all-features
   
   check_style_python:
     name: Check file formatting and style (Python)
@@ -74,7 +61,20 @@ jobs:
       - name: Pyright
         run: |
           poetry run pyright
-    
+  
+  test_rust:
+    name: Tests (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly
+  
+      - name: Run tests
+        run: cargo test --workspace --all-features
+
   test_python:
     name: Tests (Python)
     runs-on: ubuntu-latest
