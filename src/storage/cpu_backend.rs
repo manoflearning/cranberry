@@ -3,6 +3,8 @@ use std::simd::{f32x64, StdFloat};
 const CHUNK_SIZE: usize = 64;
 
 pub mod unary_ops {
+    use std::ops::Neg;
+
     use super::*;
     #[inline(always)]
     pub fn neg(a: &[f32], b: &mut [f32]) {
@@ -10,12 +12,9 @@ pub mod unary_ops {
 
         a.array_chunks::<CHUNK_SIZE>()
             .map(|a| f32x64::from_array(*a))
-            .zip(
-                b.array_chunks_mut::<CHUNK_SIZE>()
-                    .map(|b| f32x64::from_array(*b)),
-            )
-            .for_each(|(a, mut _b)| {
-                _b = -a;
+            .zip(b.array_chunks_mut::<CHUNK_SIZE>())
+            .for_each(|(a, b)| {
+                a.neg().copy_to_slice(b);
             });
 
         let remain = a.len() - a.len() % CHUNK_SIZE;
@@ -29,12 +28,9 @@ pub mod unary_ops {
 
         a.array_chunks::<CHUNK_SIZE>()
             .map(|a| f32x64::from_array(*a))
-            .zip(
-                b.array_chunks_mut::<CHUNK_SIZE>()
-                    .map(|b| f32x64::from_array(*b)),
-            )
-            .for_each(|(a, mut _b)| {
-                _b = a.sqrt();
+            .zip(b.array_chunks_mut::<CHUNK_SIZE>())
+            .for_each(|(a, b)| {
+                a.sqrt().copy_to_slice(b);
             });
 
         let remain = a.len() - a.len() % CHUNK_SIZE;
@@ -43,37 +39,14 @@ pub mod unary_ops {
         });
     }
     #[inline(always)]
-    pub fn relu(a: &[f32], b: &mut [f32]) {
-        assert!(a.len() == b.len());
-
-        let zero = f32x64::splat(0.0);
-        a.array_chunks::<CHUNK_SIZE>()
-            .map(|a| f32x64::from_array(*a))
-            .zip(
-                b.array_chunks_mut::<CHUNK_SIZE>()
-                    .map(|b| f32x64::from_array(*b)),
-            )
-            .for_each(|(a, mut _b)| {
-                _b = if a > zero { a } else { zero };
-            });
-
-        let remain = a.len() - a.len() % CHUNK_SIZE;
-        a[remain..].iter().zip(&mut b[remain..]).for_each(|(a, b)| {
-            *b = if *a > 0.0 { *a } else { 0.0 };
-        });
-    }
-    #[inline(always)]
     pub fn exp(a: &[f32], b: &mut [f32]) {
         assert!(a.len() == b.len());
 
         a.array_chunks::<CHUNK_SIZE>()
             .map(|a| f32x64::from_array(*a))
-            .zip(
-                b.array_chunks_mut::<CHUNK_SIZE>()
-                    .map(|b| f32x64::from_array(*b)),
-            )
-            .for_each(|(a, mut _b)| {
-                _b = a.exp();
+            .zip(b.array_chunks_mut::<CHUNK_SIZE>())
+            .for_each(|(a, b)| {
+                a.exp().copy_to_slice(b);
             });
 
         let remain = a.len() - a.len() % CHUNK_SIZE;
@@ -87,12 +60,9 @@ pub mod unary_ops {
 
         a.array_chunks::<CHUNK_SIZE>()
             .map(|a| f32x64::from_array(*a))
-            .zip(
-                b.array_chunks_mut::<CHUNK_SIZE>()
-                    .map(|b| f32x64::from_array(*b)),
-            )
-            .for_each(|(a, mut _b)| {
-                _b = a.ln();
+            .zip(b.array_chunks_mut::<CHUNK_SIZE>())
+            .for_each(|(a, b)| {
+                a.ln().copy_to_slice(b);
             });
 
         let remain = a.len() - a.len() % CHUNK_SIZE;
@@ -103,23 +73,22 @@ pub mod unary_ops {
 }
 
 pub mod binary_ops {
+    use std::ops::{Add, Div, Mul, Sub};
+
     use super::*;
     #[inline(always)]
     pub fn add(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
 
         a.array_chunks::<CHUNK_SIZE>()
-            .map(|a| f32x64::from_array(*a))
+            .map(|a| f32x64::from_slice(a))
             .zip(
                 b.array_chunks::<CHUNK_SIZE>()
-                    .map(|b| f32x64::from_array(*b)),
+                    .map(|b| f32x64::from_slice(b)),
             )
-            .zip(
-                c.array_chunks_mut::<CHUNK_SIZE>()
-                    .map(|c| f32x64::from_array(*c)),
-            )
-            .for_each(|((a, b), mut _c)| {
-                _c = a + b;
+            .zip(c.array_chunks_mut::<CHUNK_SIZE>())
+            .for_each(|((a, b), c)| {
+                a.add(b).copy_to_slice(c);
             });
 
         let remain = a.len() - a.len() % CHUNK_SIZE;
@@ -136,17 +105,14 @@ pub mod binary_ops {
         assert!(a.len() == b.len() && b.len() == c.len());
 
         a.array_chunks::<CHUNK_SIZE>()
-            .map(|a| f32x64::from_array(*a))
+            .map(|a| f32x64::from_slice(a))
             .zip(
                 b.array_chunks::<CHUNK_SIZE>()
-                    .map(|b| f32x64::from_array(*b)),
+                    .map(|b| f32x64::from_slice(b)),
             )
-            .zip(
-                c.array_chunks_mut::<CHUNK_SIZE>()
-                    .map(|c| f32x64::from_array(*c)),
-            )
-            .for_each(|((a, b), mut _c)| {
-                _c = a - b;
+            .zip(c.array_chunks_mut::<CHUNK_SIZE>())
+            .for_each(|((a, b), c)| {
+                a.sub(b).copy_to_slice(c);
             });
 
         let remain = a.len() - a.len() % CHUNK_SIZE;
@@ -163,17 +129,14 @@ pub mod binary_ops {
         assert!(a.len() == b.len() && b.len() == c.len());
 
         a.array_chunks::<CHUNK_SIZE>()
-            .map(|a| f32x64::from_array(*a))
+            .map(|a| f32x64::from_slice(a))
             .zip(
                 b.array_chunks::<CHUNK_SIZE>()
-                    .map(|b| f32x64::from_array(*b)),
+                    .map(|b| f32x64::from_slice(b)),
             )
-            .zip(
-                c.array_chunks_mut::<CHUNK_SIZE>()
-                    .map(|c| f32x64::from_array(*c)),
-            )
-            .for_each(|((a, b), mut _c)| {
-                _c = a * b;
+            .zip(c.array_chunks_mut::<CHUNK_SIZE>())
+            .for_each(|((a, b), c)| {
+                a.mul(b).copy_to_slice(c);
             });
 
         let remain = a.len() - a.len() % CHUNK_SIZE;
@@ -190,17 +153,14 @@ pub mod binary_ops {
         assert!(a.len() == b.len() && b.len() == c.len());
 
         a.array_chunks::<CHUNK_SIZE>()
-            .map(|a| f32x64::from_array(*a))
+            .map(|a| f32x64::from_slice(a))
             .zip(
                 b.array_chunks::<CHUNK_SIZE>()
-                    .map(|b| f32x64::from_array(*b)),
+                    .map(|b| f32x64::from_slice(b)),
             )
-            .zip(
-                c.array_chunks_mut::<CHUNK_SIZE>()
-                    .map(|c| f32x64::from_array(*c)),
-            )
-            .for_each(|((a, b), mut _c)| {
-                _c = a / b;
+            .zip(c.array_chunks_mut::<CHUNK_SIZE>())
+            .for_each(|((a, b), c)| {
+                a.div(b).copy_to_slice(c);
             });
 
         let remain = a.len() - a.len() % CHUNK_SIZE;
@@ -216,37 +176,33 @@ pub mod binary_ops {
 
 pub mod reduce_ops {
     use super::*;
-    use std::simd::num::SimdFloat;
+    use std::{ops::AddAssign, simd::num::SimdFloat};
     #[inline(always)]
     pub fn sum(a: &[f32], b: &mut [f32]) {
         assert!(b.len() == 1);
 
-        let mut sum = f32x64::splat(0.0);
-
+        let mut acc = f32x64::splat(0.0);
         a.array_chunks::<CHUNK_SIZE>()
             .map(|a| f32x64::from_array(*a))
             .for_each(|a| {
-                sum += a;
+                acc.add_assign(a);
             });
-        b[0] = sum.reduce_sum();
 
         let remain = a.len() - a.len() % CHUNK_SIZE;
-        b[0] += a[remain..].iter().sum::<f32>();
+        b[0] = acc.reduce_sum() + a[remain..].iter().sum::<f32>();
     }
     #[inline(always)]
     pub fn max(a: &[f32], b: &mut [f32]) {
         assert!(b.len() == 1);
 
-        let mut max = f32x64::splat(f32::NEG_INFINITY);
-
+        let mut acc = f32x64::splat(f32::NEG_INFINITY);
         a.array_chunks::<CHUNK_SIZE>()
             .map(|a| f32x64::from_array(*a))
             .for_each(|a| {
-                max = if a > max { a } else { max };
+                acc = acc.simd_max(a);
             });
-        b[0] = max.reduce_max();
 
         let remain = a.len() - a.len() % CHUNK_SIZE;
-        b[0] = a[remain..].iter().copied().fold(b[0], f32::max);
+        b[0] = a[remain..].iter().copied().fold(acc.reduce_max(), f32::max);
     }
 }

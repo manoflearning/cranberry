@@ -1,6 +1,10 @@
 use crate::device::Device;
 mod cpu_backend;
 
+#[cfg(test)]
+mod tests;
+
+#[derive(PartialEq)]
 pub struct Storage {
     data: Vec<f32>,
     data_size: usize,
@@ -9,24 +13,21 @@ pub struct Storage {
 }
 
 impl Storage {
-    pub fn new(value: f32, size: usize, device: Device) -> Self {
+    pub fn new(value: f32, size: usize, device: &str) -> Self {
         Storage {
             data: vec![value; size],
             data_size: size,
-            device,
+            device: Device::from_str(device),
             ref_count: 1,
         }
     }
-    pub fn from_vec(vec: Vec<f32>, device: Device) -> Self {
+    pub fn from_vec(vec: Vec<f32>, device: &str) -> Self {
         Storage {
             data_size: vec.len(),
             data: vec,
-            device,
+            device: Device::from_str(device),
             ref_count: 1,
         }
-    }
-    pub fn device(&self) -> Device {
-        self.device.clone()
     }
     pub fn incref(&mut self) {
         assert!(0 < self.ref_count);
@@ -60,8 +61,8 @@ impl Storage {
 impl Storage {
     #[inline(always)]
     pub fn neg(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
-        assert!(a.device() == b.device());
-        match a.device() {
+        assert!(a.device == b.device);
+        match a.device {
             Device::Cpu => {
                 cpu_backend::unary_ops::neg(a.get_items(idx_a, size), b.get_items_mut(idx_b, size))
             }
@@ -71,8 +72,8 @@ impl Storage {
     }
     #[inline(always)]
     pub fn sqrt(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
-        assert!(a.device() == b.device());
-        match a.device() {
+        assert!(a.device == b.device);
+        match a.device {
             Device::Cpu => {
                 cpu_backend::unary_ops::sqrt(a.get_items(idx_a, size), b.get_items_mut(idx_b, size))
             }
@@ -81,20 +82,9 @@ impl Storage {
         }
     }
     #[inline(always)]
-    pub fn relu(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
-        assert!(a.device() == b.device());
-        match a.device() {
-            Device::Cpu => {
-                cpu_backend::unary_ops::relu(a.get_items(idx_a, size), b.get_items_mut(idx_b, size))
-            }
-            Device::Metal => todo!(),
-            Device::Cuda => todo!(),
-        }
-    }
-    #[inline(always)]
     pub fn exp(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
-        assert!(a.device() == b.device());
-        match a.device() {
+        assert!(a.device == b.device);
+        match a.device {
             Device::Cpu => {
                 cpu_backend::unary_ops::exp(a.get_items(idx_a, size), b.get_items_mut(idx_b, size))
             }
@@ -104,8 +94,8 @@ impl Storage {
     }
     #[inline(always)]
     pub fn log(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
-        assert!(a.device() == b.device());
-        match a.device() {
+        assert!(a.device == b.device);
+        match a.device {
             Device::Cpu => {
                 cpu_backend::unary_ops::log(a.get_items(idx_a, size), b.get_items_mut(idx_b, size))
             }
@@ -123,8 +113,8 @@ impl Storage {
         idx_c: usize,
         size: usize,
     ) {
-        assert!(a.device() == b.device() && b.device() == c.device());
-        match a.device() {
+        assert!(a.device == b.device && b.device == c.device);
+        match a.device {
             Device::Cpu => cpu_backend::binary_ops::add(
                 a.get_items(idx_a, size),
                 b.get_items(idx_b, size),
@@ -144,8 +134,8 @@ impl Storage {
         idx_c: usize,
         size: usize,
     ) {
-        assert!(a.device() == b.device() && b.device() == c.device());
-        match a.device() {
+        assert!(a.device == b.device && b.device == c.device);
+        match a.device {
             Device::Cpu => cpu_backend::binary_ops::sub(
                 a.get_items(idx_a, size),
                 b.get_items(idx_b, size),
@@ -165,8 +155,8 @@ impl Storage {
         idx_c: usize,
         size: usize,
     ) {
-        assert!(a.device() == b.device() && b.device() == c.device());
-        match a.device() {
+        assert!(a.device == b.device && b.device == c.device);
+        match a.device {
             Device::Cpu => cpu_backend::binary_ops::mul(
                 a.get_items(idx_a, size),
                 b.get_items(idx_b, size),
@@ -186,8 +176,8 @@ impl Storage {
         idx_c: usize,
         size: usize,
     ) {
-        assert!(a.device() == b.device() && b.device() == c.device());
-        match a.device() {
+        assert!(a.device == b.device && b.device == c.device);
+        match a.device {
             Device::Cpu => cpu_backend::binary_ops::div(
                 a.get_items(idx_a, size),
                 b.get_items(idx_b, size),
@@ -199,8 +189,8 @@ impl Storage {
     }
     #[inline(always)]
     pub fn sum(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
-        assert!(a.device() == b.device());
-        match a.device() {
+        assert!(a.device == b.device);
+        match a.device {
             Device::Cpu => {
                 cpu_backend::reduce_ops::sum(a.get_items(idx_a, size), b.get_items_mut(idx_b, 1))
             }
@@ -210,8 +200,8 @@ impl Storage {
     }
     #[inline(always)]
     pub fn max(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
-        assert!(a.device() == b.device());
-        match a.device() {
+        assert!(a.device == b.device);
+        match a.device {
             Device::Cpu => {
                 cpu_backend::reduce_ops::max(a.get_items(idx_a, size), b.get_items_mut(idx_b, 1))
             }
