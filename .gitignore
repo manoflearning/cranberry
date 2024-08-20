@@ -2,6 +2,6 @@ target/
 __pycache__/
 .pytest_cache/
 *.so
-Cargo.lock
 .DS_Store
 .ruff_cache/
+dist/
