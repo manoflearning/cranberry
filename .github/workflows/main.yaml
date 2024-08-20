@@ -1,0 +1,93 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+name: CI
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    name: Pass
+    needs:
+      - check_style_rust
+      - test_rust
+      - check_style_python
+      - test_python
+    steps:
+      - run: exit 0
+
+  check_style_rust:
+    name: Check file formatting and style (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+
+      - name: Check file formatting
+        run: cargo fmt --all -- --check
+  
+      - name: Run clippy
+        run: cargo clippy --workspace --all-features
+
+  test_rust:
+    name: Tests (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly
+  
+      - name: Run tests
+        run: cargo test --workspace --all-features
+  
+  check_style_python:
+    name: Check file formatting and style (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.11
+
+      - run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry install
+
+      - name: Ruff
+        run: |
+          poetry run ruff check .
+          poetry run ruff format .
+
+      - name: Pyright
+        run: |
+          poetry run pyright
+    
+  test_python:
+    name: Tests (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.11
+
+      - run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry install
+
+      - run: |
+          poetry run python -m pytest -v
