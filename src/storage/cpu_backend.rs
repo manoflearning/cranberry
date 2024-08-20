@@ -12,9 +12,7 @@ pub mod unary_ops {
 
         a.array_chunks::<CHUNK_SIZE>()
             .map(|a| f32x64::from_array(*a))
-            .zip(
-                b.array_chunks_mut::<CHUNK_SIZE>()
-            )
+            .zip(b.array_chunks_mut::<CHUNK_SIZE>())
             .for_each(|(a, b)| {
                 a.neg().copy_to_slice(b);
             });
@@ -30,9 +28,7 @@ pub mod unary_ops {
 
         a.array_chunks::<CHUNK_SIZE>()
             .map(|a| f32x64::from_array(*a))
-            .zip(
-                b.array_chunks_mut::<CHUNK_SIZE>()
-            )
+            .zip(b.array_chunks_mut::<CHUNK_SIZE>())
             .for_each(|(a, b)| {
                 a.sqrt().copy_to_slice(b);
             });
@@ -48,9 +44,7 @@ pub mod unary_ops {
 
         a.array_chunks::<CHUNK_SIZE>()
             .map(|a| f32x64::from_array(*a))
-            .zip(
-                b.array_chunks_mut::<CHUNK_SIZE>()
-            )
+            .zip(b.array_chunks_mut::<CHUNK_SIZE>())
             .for_each(|(a, b)| {
                 a.exp().copy_to_slice(b);
             });
@@ -66,9 +60,7 @@ pub mod unary_ops {
 
         a.array_chunks::<CHUNK_SIZE>()
             .map(|a| f32x64::from_array(*a))
-            .zip(
-                b.array_chunks_mut::<CHUNK_SIZE>()
-            )
+            .zip(b.array_chunks_mut::<CHUNK_SIZE>())
             .for_each(|(a, b)| {
                 a.ln().copy_to_slice(b);
             });
@@ -94,9 +86,7 @@ pub mod binary_ops {
                 b.array_chunks::<CHUNK_SIZE>()
                     .map(|b| f32x64::from_slice(b)),
             )
-            .zip(
-                c.array_chunks_mut::<CHUNK_SIZE>()
-            )
+            .zip(c.array_chunks_mut::<CHUNK_SIZE>())
             .for_each(|((a, b), c)| {
                 a.add(b).copy_to_slice(c);
             });
@@ -120,9 +110,7 @@ pub mod binary_ops {
                 b.array_chunks::<CHUNK_SIZE>()
                     .map(|b| f32x64::from_slice(b)),
             )
-            .zip(
-                c.array_chunks_mut::<CHUNK_SIZE>()
-            )
+            .zip(c.array_chunks_mut::<CHUNK_SIZE>())
             .for_each(|((a, b), c)| {
                 a.sub(b).copy_to_slice(c);
             });
@@ -146,9 +134,7 @@ pub mod binary_ops {
                 b.array_chunks::<CHUNK_SIZE>()
                     .map(|b| f32x64::from_slice(b)),
             )
-            .zip(
-                c.array_chunks_mut::<CHUNK_SIZE>()
-            )
+            .zip(c.array_chunks_mut::<CHUNK_SIZE>())
             .for_each(|((a, b), c)| {
                 a.mul(b).copy_to_slice(c);
             });
@@ -172,9 +158,7 @@ pub mod binary_ops {
                 b.array_chunks::<CHUNK_SIZE>()
                     .map(|b| f32x64::from_slice(b)),
             )
-            .zip(
-                c.array_chunks_mut::<CHUNK_SIZE>()
-            )
+            .zip(c.array_chunks_mut::<CHUNK_SIZE>())
             .for_each(|((a, b), c)| {
                 a.div(b).copy_to_slice(c);
             });

@@ -52,7 +52,11 @@ fn test_storage_log() {
 fn test_storage_add() {
     let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
     let y = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let z = x.iter().zip(y.iter()).map(|(a, b)| a + b).collect::<Vec<f32>>();
+    let z = x
+        .iter()
+        .zip(y.iter())
+        .map(|(a, b)| a + b)
+        .collect::<Vec<f32>>();
 
     let a = Storage::from_vec(x.clone(), DEVICE);
     let b = Storage::from_vec(y.clone(), DEVICE);
@@ -65,7 +69,11 @@ fn test_storage_add() {
 fn test_storage_sub() {
     let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
     let y = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let z = x.iter().zip(y.iter()).map(|(a, b)| a - b).collect::<Vec<f32>>();
+    let z = x
+        .iter()
+        .zip(y.iter())
+        .map(|(a, b)| a - b)
+        .collect::<Vec<f32>>();
 
     let a = Storage::from_vec(x.clone(), DEVICE);
     let b = Storage::from_vec(y.clone(), DEVICE);
@@ -78,7 +86,11 @@ fn test_storage_sub() {
 fn test_storage_mul() {
     let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
     let y = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let z = x.iter().zip(y.iter()).map(|(a, b)| a * b).collect::<Vec<f32>>();
+    let z = x
+        .iter()
+        .zip(y.iter())
+        .map(|(a, b)| a * b)
+        .collect::<Vec<f32>>();
 
     let a = Storage::from_vec(x.clone(), DEVICE);
     let b = Storage::from_vec(y.clone(), DEVICE);
@@ -91,7 +103,11 @@ fn test_storage_mul() {
 fn test_storage_div() {
     let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
     let y = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let z = x.iter().zip(y.iter()).map(|(a, b)| a / b).collect::<Vec<f32>>();
+    let z = x
+        .iter()
+        .zip(y.iter())
+        .map(|(a, b)| a / b)
+        .collect::<Vec<f32>>();
 
     let a = Storage::from_vec(x.clone(), DEVICE);
     let b = Storage::from_vec(y.clone(), DEVICE);
