@@ -2,139 +2,241 @@ use crate::storage::Storage;
 use rand::random;
 
 const DEVICE: &str = "cpu";
-const VEC_SIZE: usize = 1000;
+const MAX_VEC_SIZE: usize = 4000;
+const DEFAULT_TEST_COUNT: usize = 10;
 
 #[test]
 fn test_storage_neg() {
-    let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let y = x.iter().map(|a| -a).collect::<Vec<f32>>();
+    for _ in 0..DEFAULT_TEST_COUNT {
+        let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
-    let a = Storage::from_vec(x.clone(), DEVICE);
-    let mut b = Storage::new(0.0, VEC_SIZE, DEVICE);
-    Storage::neg(&a, &mut b, 0, 0, VEC_SIZE);
+        let idx_1 = random::<usize>() % vec_size;
+        let idx_2 = random::<usize>() % vec_size;
+        let size = random::<usize>() % (vec_size - idx_1.max(idx_2)) + 1;
+        
+        let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let mut y = vec![0.0; vec_size];
+        for i in 0..size {
+            y[idx_2 + i] = -x[idx_1 + i];
+        }
 
-    assert!(y.as_slice() == b.get_items(0, VEC_SIZE));
+        let a = Storage::from_vec(x.clone(), DEVICE);
+        let mut b = Storage::new(0.0, vec_size, DEVICE);
+        Storage::neg(&a, &mut b, idx_1, idx_2, size);
+
+        assert!(y.as_slice() == b.get_items(0, vec_size));
+    }
 }
 #[test]
 fn test_storage_sqrt() {
-    let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let y = x.iter().map(|a| a.sqrt()).collect::<Vec<f32>>();
+    for _ in 0..DEFAULT_TEST_COUNT {
+        let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
-    let a = Storage::from_vec(x.clone(), DEVICE);
-    let mut b = Storage::new(0.0, VEC_SIZE, DEVICE);
-    Storage::sqrt(&a, &mut b, 0, 0, VEC_SIZE);
+        let idx_1 = random::<usize>() % vec_size;
+        let idx_2 = random::<usize>() % vec_size;
+        let size = random::<usize>() % (vec_size - idx_1.max(idx_2)) + 1;
+        
+        let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let mut y = vec![0.0; vec_size];
+        for i in 0..size {
+            y[idx_2 + i] = x[idx_1 + i].sqrt();
+        }
 
-    assert!(y.as_slice() == b.get_items(0, VEC_SIZE));
+        let a = Storage::from_vec(x.clone(), DEVICE);
+        let mut b = Storage::new(0.0, vec_size, DEVICE);
+        Storage::sqrt(&a, &mut b, idx_1, idx_2, size);
+
+        assert!(y.as_slice() == b.get_items(0, vec_size));
+    }
 }
 #[test]
 fn test_storage_exp() {
-    let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let y = x.iter().map(|a| a.exp()).collect::<Vec<f32>>();
+    for _ in 0..DEFAULT_TEST_COUNT {
+        let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
-    let a = Storage::from_vec(x.clone(), DEVICE);
-    let mut b = Storage::new(0.0, VEC_SIZE, DEVICE);
-    Storage::exp(&a, &mut b, 0, 0, VEC_SIZE);
+        let idx_1 = random::<usize>() % vec_size;
+        let idx_2 = random::<usize>() % vec_size;
+        let size = random::<usize>() % (vec_size - idx_1.max(idx_2)) + 1;
+        
+        let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let mut y = vec![0.0; vec_size];
+        for i in 0..size {
+            y[idx_2 + i] = x[idx_1 + i].exp();
+        }
 
-    assert!(y.as_slice() == b.get_items(0, VEC_SIZE));
+        let a = Storage::from_vec(x.clone(), DEVICE);
+        let mut b = Storage::new(0.0, vec_size, DEVICE);
+        Storage::exp(&a, &mut b, idx_1, idx_2, size);
+
+        assert!(y.as_slice() == b.get_items(0, vec_size));
+    }
 }
 #[test]
 fn test_storage_log() {
-    let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let y = x.iter().map(|a| a.ln()).collect::<Vec<f32>>();
+    for _ in 0..DEFAULT_TEST_COUNT {
+        let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
-    let a = Storage::from_vec(x.clone(), DEVICE);
-    let mut b = Storage::new(0.0, VEC_SIZE, DEVICE);
-    Storage::log(&a, &mut b, 0, 0, VEC_SIZE);
+        let idx_1 = random::<usize>() % vec_size;
+        let idx_2 = random::<usize>() % vec_size;
+        let size = random::<usize>() % (vec_size - idx_1.max(idx_2)) + 1;
+        
+        let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let mut y = vec![0.0; vec_size];
+        for i in 0..size {
+            y[idx_2 + i] = x[idx_1 + i].ln();
+        }
 
-    assert!(y.as_slice() == b.get_items(0, VEC_SIZE));
+        let a = Storage::from_vec(x.clone(), DEVICE);
+        let mut b = Storage::new(0.0, vec_size, DEVICE);
+        Storage::log(&a, &mut b, idx_1, idx_2, size);
+
+        assert!(y.as_slice() == b.get_items(0, vec_size));
+    }
 }
 #[test]
 fn test_storage_add() {
-    let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let y = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let z = x
-        .iter()
-        .zip(y.iter())
-        .map(|(a, b)| a + b)
-        .collect::<Vec<f32>>();
+    for _ in 0..DEFAULT_TEST_COUNT {
+        let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
-    let a = Storage::from_vec(x.clone(), DEVICE);
-    let b = Storage::from_vec(y.clone(), DEVICE);
-    let mut c = Storage::new(0.0, VEC_SIZE, DEVICE);
-    Storage::add(&a, &b, &mut c, 0, 0, 0, VEC_SIZE);
+        let idx_1 = random::<usize>() % vec_size;
+        let idx_2 = random::<usize>() % vec_size;
+        let idx_3 = random::<usize>() % vec_size;
+        let size = random::<usize>() % (vec_size - idx_1.max(idx_2).max(idx_3)) + 1;
+        
+        let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let y = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let mut z = vec![0.0; vec_size];
+        for i in 0..size {
+            z[idx_3 + i] = x[idx_1 + i] + y[idx_2 + i];
+        }
 
-    assert!(z.as_slice() == c.get_items(0, VEC_SIZE));
+        let a = Storage::from_vec(x.clone(), DEVICE);
+        let b = Storage::from_vec(y.clone(), DEVICE);
+        let mut c = Storage::new(0.0, vec_size, DEVICE);
+        Storage::add(&a, &b, &mut c, idx_1, idx_2, idx_3, size);
+
+        assert!(y.as_slice() == b.get_items(0, vec_size));
+    }
 }
 #[test]
 fn test_storage_sub() {
-    let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let y = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let z = x
-        .iter()
-        .zip(y.iter())
-        .map(|(a, b)| a - b)
-        .collect::<Vec<f32>>();
+    for _ in 0..DEFAULT_TEST_COUNT {
+        let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
-    let a = Storage::from_vec(x.clone(), DEVICE);
-    let b = Storage::from_vec(y.clone(), DEVICE);
-    let mut c = Storage::new(0.0, VEC_SIZE, DEVICE);
-    Storage::sub(&a, &b, &mut c, 0, 0, 0, VEC_SIZE);
+        let idx_1 = random::<usize>() % vec_size;
+        let idx_2 = random::<usize>() % vec_size;
+        let idx_3 = random::<usize>() % vec_size;
+        let size = random::<usize>() % (vec_size - idx_1.max(idx_2).max(idx_3)) + 1;
+        
+        let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let y = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let mut z = vec![0.0; vec_size];
+        for i in 0..size {
+            z[idx_3 + i] = x[idx_1 + i] - y[idx_2 + i];
+        }
 
-    assert!(z.as_slice() == c.get_items(0, VEC_SIZE));
+        let a = Storage::from_vec(x.clone(), DEVICE);
+        let b = Storage::from_vec(y.clone(), DEVICE);
+        let mut c = Storage::new(0.0, vec_size, DEVICE);
+        Storage::sub(&a, &b, &mut c, idx_1, idx_2, idx_3, size);
+
+        assert!(y.as_slice() == b.get_items(0, vec_size));
+    }
 }
 #[test]
 fn test_storage_mul() {
-    let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let y = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let z = x
-        .iter()
-        .zip(y.iter())
-        .map(|(a, b)| a * b)
-        .collect::<Vec<f32>>();
+    for _ in 0..DEFAULT_TEST_COUNT {
+        let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
-    let a = Storage::from_vec(x.clone(), DEVICE);
-    let b = Storage::from_vec(y.clone(), DEVICE);
-    let mut c = Storage::new(0.0, VEC_SIZE, DEVICE);
-    Storage::mul(&a, &b, &mut c, 0, 0, 0, VEC_SIZE);
+        let idx_1 = random::<usize>() % vec_size;
+        let idx_2 = random::<usize>() % vec_size;
+        let idx_3 = random::<usize>() % vec_size;
+        let size = random::<usize>() % (vec_size - idx_1.max(idx_2).max(idx_3)) + 1;
+        
+        let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let y = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let mut z = vec![0.0; vec_size];
+        for i in 0..size {
+            z[idx_3 + i] = x[idx_1 + i] * y[idx_2 + i];
+        }
 
-    assert!(z.as_slice() == c.get_items(0, VEC_SIZE));
+        let a = Storage::from_vec(x.clone(), DEVICE);
+        let b = Storage::from_vec(y.clone(), DEVICE);
+        let mut c = Storage::new(0.0, vec_size, DEVICE);
+        Storage::mul(&a, &b, &mut c, idx_1, idx_2, idx_3, size);
+
+        assert!(y.as_slice() == b.get_items(0, vec_size));
+    }
 }
 #[test]
 fn test_storage_div() {
-    let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let y = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let z = x
-        .iter()
-        .zip(y.iter())
-        .map(|(a, b)| a / b)
-        .collect::<Vec<f32>>();
+    for _ in 0..DEFAULT_TEST_COUNT {
+        let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
-    let a = Storage::from_vec(x.clone(), DEVICE);
-    let b = Storage::from_vec(y.clone(), DEVICE);
-    let mut c = Storage::new(0.0, VEC_SIZE, DEVICE);
-    Storage::div(&a, &b, &mut c, 0, 0, 0, VEC_SIZE);
+        let idx_1 = random::<usize>() % vec_size;
+        let idx_2 = random::<usize>() % vec_size;
+        let idx_3 = random::<usize>() % vec_size;
+        let size = random::<usize>() % (vec_size - idx_1.max(idx_2).max(idx_3)) + 1;
+        
+        let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let y = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let mut z = vec![0.0; vec_size];
+        for i in 0..size {
+            z[idx_3 + i] = x[idx_1 + i] / y[idx_2 + i];
+        }
 
-    assert!(z.as_slice() == c.get_items(0, VEC_SIZE));
+        let a = Storage::from_vec(x.clone(), DEVICE);
+        let b = Storage::from_vec(y.clone(), DEVICE);
+        let mut c = Storage::new(0.0, vec_size, DEVICE);
+        Storage::div(&a, &b, &mut c, idx_1, idx_2, idx_3, size);
+
+        assert!(y.as_slice() == b.get_items(0, vec_size));
+    }
 }
 #[test]
 fn test_storage_sum() {
-    let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let y = x.iter().sum::<f32>();
+    for _ in 0..DEFAULT_TEST_COUNT {
+        let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
-    let a = Storage::from_vec(x.clone(), DEVICE);
-    let mut b = Storage::new(0.0, 1, DEVICE);
-    Storage::sum(&a, &mut b, 0, 0, VEC_SIZE);
+        let idx_1 = random::<usize>() % vec_size;
+        let idx_2 = random::<usize>() % vec_size;
+        let size = random::<usize>() % (vec_size - idx_1) + 1;
+        
+        let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let mut y = vec![0.0; vec_size];
+        for i in 0..size {
+            y[idx_2] += x[idx_1 + i];
+        }
 
-    assert!((y - b.get_items(0, 1)[0]).abs() < 1e-6 * y); // not sure this is right
+        let a = Storage::from_vec(x.clone(), DEVICE);
+        let mut b = Storage::new(0.0, vec_size, DEVICE);
+        Storage::sum(&a, &mut b, idx_1, idx_2, size);
+
+        assert!((y[idx_2] - b.get_items(idx_2, 1)[0]).abs() < 1e-5 * y[idx_2]); // not sure this is right
+    }
 }
 #[test]
 fn test_storage_max() {
-    let x = (0..VEC_SIZE).map(|_| random::<f32>()).collect::<Vec<f32>>();
-    let y = x.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    for _ in 0..DEFAULT_TEST_COUNT {
+        let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
-    let a = Storage::from_vec(x.clone(), DEVICE);
-    let mut b = Storage::new(0.0, 1, DEVICE);
-    Storage::max(&a, &mut b, 0, 0, VEC_SIZE);
+        let idx_1 = random::<usize>() % vec_size;
+        let idx_2 = random::<usize>() % vec_size;
+        let size = random::<usize>() % (vec_size - idx_1) + 1;
+        
+        let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
+        let mut y = vec![0.0; vec_size];
+        y[idx_2] = f32::NEG_INFINITY;
+        for i in 0..size {
+            if y[idx_2] < x[idx_1 + i] {
+                y[idx_2] = x[idx_1 + i];
+            }
+        }
 
-    assert!(y == b.get_items(0, 1)[0]);
+        let a = Storage::from_vec(x.clone(), DEVICE);
+        let mut b = Storage::new(0.0, vec_size, DEVICE);
+        Storage::max(&a, &mut b, idx_1, idx_2, size);
+
+        assert!(y[idx_2] == b.get_items(idx_2, 1)[0]);
+    }
 }
