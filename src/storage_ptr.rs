@@ -36,41 +36,41 @@ impl StoragePtr {
 #[pyo3::pymethods]
 impl StoragePtr {
     #[staticmethod]
-    fn storage_full(value: f32, size: usize, device: &str) -> StoragePtr {
+    fn full(value: f32, size: usize, device: &str) -> StoragePtr {
         StoragePtr::from_storage(&Storage::new(value, size, device))
     }
     #[staticmethod]
-    fn storage_from_vec(vec: Vec<f32>, device: &str) -> StoragePtr {
+    fn from_vec(vec: Vec<f32>, device: &str) -> StoragePtr {
         StoragePtr::from_storage(&Storage::from_vec(vec, device))
     }
     #[staticmethod]
-    fn storage_clone(storage_ptr: &mut StoragePtr) -> StoragePtr {
+    fn clone(storage_ptr: &mut StoragePtr) -> StoragePtr {
         storage_ptr.get_storage_mut().incref();
         StoragePtr::new(storage_ptr.ptr)
     }
     #[staticmethod]
-    fn storage_drop(storage_ptr: &mut StoragePtr) {
+    fn drop(storage_ptr: &mut StoragePtr) {
         storage_ptr.get_storage_mut().decref();
         storage_ptr.ptr = 0;
     }
     #[staticmethod]
-    fn storage_neg(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
+    fn neg(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
         Storage::neg(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
     }
     #[staticmethod]
-    fn storage_sqrt(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
+    fn sqrt(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
         Storage::sqrt(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size)
     }
     #[staticmethod]
-    fn storage_exp(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
+    fn exp(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
         Storage::exp(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
     }
     #[staticmethod]
-    fn storage_log(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
+    fn log(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
         Storage::log(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
     }
     #[staticmethod]
-    fn storage_add(
+    fn add(
         a: &StoragePtr,
         b: &StoragePtr,
         c: &mut StoragePtr,
@@ -90,7 +90,7 @@ impl StoragePtr {
         );
     }
     #[staticmethod]
-    fn storage_sub(
+    fn sub(
         a: &StoragePtr,
         b: &StoragePtr,
         c: &mut StoragePtr,
@@ -110,7 +110,7 @@ impl StoragePtr {
         );
     }
     #[staticmethod]
-    fn storage_mul(
+    fn mul(
         a: &StoragePtr,
         b: &StoragePtr,
         c: &mut StoragePtr,
@@ -130,7 +130,7 @@ impl StoragePtr {
         );
     }
     #[staticmethod]
-    fn storage_div(
+    fn div(
         a: &StoragePtr,
         b: &StoragePtr,
         c: &mut StoragePtr,
@@ -150,11 +150,11 @@ impl StoragePtr {
         );
     }
     #[staticmethod]
-    fn storage_sum(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
+    fn sum(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
         Storage::sum(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
     }
     #[staticmethod]
-    fn storage_max(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
+    fn max(a: &StoragePtr, b: &mut StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
         Storage::max(a.get_storage(), b.get_storage_mut(), idx_a, idx_b, size);
     }
 }
