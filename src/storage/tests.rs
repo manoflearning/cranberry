@@ -13,7 +13,7 @@ fn test_storage_neg() {
         let idx_1 = random::<usize>() % vec_size;
         let idx_2 = random::<usize>() % vec_size;
         let size = random::<usize>() % (vec_size - idx_1.max(idx_2)) + 1;
-        
+
         let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let mut y = vec![0.0; vec_size];
         for i in 0..size {
@@ -35,7 +35,7 @@ fn test_storage_sqrt() {
         let idx_1 = random::<usize>() % vec_size;
         let idx_2 = random::<usize>() % vec_size;
         let size = random::<usize>() % (vec_size - idx_1.max(idx_2)) + 1;
-        
+
         let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let mut y = vec![0.0; vec_size];
         for i in 0..size {
@@ -57,7 +57,7 @@ fn test_storage_exp() {
         let idx_1 = random::<usize>() % vec_size;
         let idx_2 = random::<usize>() % vec_size;
         let size = random::<usize>() % (vec_size - idx_1.max(idx_2)) + 1;
-        
+
         let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let mut y = vec![0.0; vec_size];
         for i in 0..size {
@@ -79,7 +79,7 @@ fn test_storage_log() {
         let idx_1 = random::<usize>() % vec_size;
         let idx_2 = random::<usize>() % vec_size;
         let size = random::<usize>() % (vec_size - idx_1.max(idx_2)) + 1;
-        
+
         let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let mut y = vec![0.0; vec_size];
         for i in 0..size {
@@ -102,7 +102,7 @@ fn test_storage_add() {
         let idx_2 = random::<usize>() % vec_size;
         let idx_3 = random::<usize>() % vec_size;
         let size = random::<usize>() % (vec_size - idx_1.max(idx_2).max(idx_3)) + 1;
-        
+
         let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let y = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let mut z = vec![0.0; vec_size];
@@ -127,7 +127,7 @@ fn test_storage_sub() {
         let idx_2 = random::<usize>() % vec_size;
         let idx_3 = random::<usize>() % vec_size;
         let size = random::<usize>() % (vec_size - idx_1.max(idx_2).max(idx_3)) + 1;
-        
+
         let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let y = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let mut z = vec![0.0; vec_size];
@@ -152,7 +152,7 @@ fn test_storage_mul() {
         let idx_2 = random::<usize>() % vec_size;
         let idx_3 = random::<usize>() % vec_size;
         let size = random::<usize>() % (vec_size - idx_1.max(idx_2).max(idx_3)) + 1;
-        
+
         let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let y = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let mut z = vec![0.0; vec_size];
@@ -177,7 +177,7 @@ fn test_storage_div() {
         let idx_2 = random::<usize>() % vec_size;
         let idx_3 = random::<usize>() % vec_size;
         let size = random::<usize>() % (vec_size - idx_1.max(idx_2).max(idx_3)) + 1;
-        
+
         let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let y = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let mut z = vec![0.0; vec_size];
@@ -201,7 +201,7 @@ fn test_storage_sum() {
         let idx_1 = random::<usize>() % vec_size;
         let idx_2 = random::<usize>() % vec_size;
         let size = random::<usize>() % (vec_size - idx_1) + 1;
-        
+
         let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let mut y = vec![0.0; vec_size];
         for i in 0..size {
@@ -223,7 +223,7 @@ fn test_storage_max() {
         let idx_1 = random::<usize>() % vec_size;
         let idx_2 = random::<usize>() % vec_size;
         let size = random::<usize>() % (vec_size - idx_1) + 1;
-        
+
         let x = (0..vec_size).map(|_| random::<f32>()).collect::<Vec<f32>>();
         let mut y = vec![0.0; vec_size];
         y[idx_2] = f32::NEG_INFINITY;
