@@ -23,11 +23,8 @@ class View:
             stride[i] = shape[i + 1] * stride[i + 1]
         return tuple(stride)
 
-    def _calculate_total_elements(self, shape):
-        total = 1
-        for dim in shape:
-            total *= dim
-        return total
+    def _calculate_total_elements(self, shape: Tuple[int, ...]) -> int:
+        return shape[0] if len(shape) == 1 else shape[0] * self._calculate_total_elements(shape[1:])
 
     def reshape(self, new_shape):
         total_elements = self._calculate_total_elements(self.shape)
