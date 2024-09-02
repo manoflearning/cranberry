@@ -26,12 +26,12 @@ class View:
     def _calculate_total_elements(self, shape: Tuple[int, ...]) -> int:
         return shape[0] if len(shape) == 1 else shape[0] * self._calculate_total_elements(shape[1:])
 
-    def reshape(self, new_shape):
+    def reshape(self, shape: Tuple[int, ...]):
         total_elements = self._calculate_total_elements(self.shape)
         new_shape_with_minus_one = []
         inferred_index = None
 
-        for i, dim in enumerate(new_shape):
+        for i, dim in enumerate(shape):
             if dim == -1:
                 if inferred_index is not None:
                     raise ValueError("Only one dimension can be inferred")
@@ -54,7 +54,7 @@ class View:
         self.shape = tuple(new_shape_with_minus_one)
         self.stride = self._compute_stride(self.shape)
 
-    def permute(self, *dims):
+    def permute(self, dims: Tuple[int, ...]):
         if len(dims) != len(self.shape):
             raise ValueError(
                 "Invalid permutation, dims should match the number of dimensions."
