@@ -2,6 +2,7 @@ from typing import Optional, Tuple
 
 MAX_RANK: int = 4
 
+
 class View:
     def __init__(
         self,
@@ -24,11 +25,15 @@ class View:
         return tuple(stride)
 
     def _calculate_total_elements(self, shape: Tuple[int, ...]) -> int:
-        return shape[0] if len(shape) == 1 else shape[0] * self._calculate_total_elements(shape[1:])
+        return (
+            shape[0]
+            if len(shape) == 1
+            else shape[0] * self._calculate_total_elements(shape[1:])
+        )
 
     def reshape(self, shape: Tuple[int, ...]):
         total_elements = self._calculate_total_elements(self.shape)
-        new_shape_with_minus_one = []
+        new_shape_with_minus_one: list[int] = []
         inferred_index = None
 
         for i, dim in enumerate(shape):
@@ -42,11 +47,13 @@ class View:
 
         if inferred_index is not None:
             inferred_dim = total_elements // self._calculate_total_elements(
-                new_shape_with_minus_one
+                tuple(new_shape_with_minus_one)
             )
             new_shape_with_minus_one[inferred_index] = inferred_dim
 
-        new_total_elements = self._calculate_total_elements(new_shape_with_minus_one)
+        new_total_elements = self._calculate_total_elements(
+            tuple(new_shape_with_minus_one)
+        )
 
         if total_elements != new_total_elements:
             raise ValueError("Reshape cannot change the total number of elements.")
