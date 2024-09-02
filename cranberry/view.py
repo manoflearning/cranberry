@@ -1,16 +1,26 @@
-class View:
-    def __init__(self, shape, stride=None, offset=0):
-        self.shape = shape
-        self.stride = stride if stride is not None else self._compute_stride(shape)
-        self.offset = offset
+from typing import Optional, Tuple
 
-    def _compute_stride(self, shape):
-        stride = []
-        for dim in reversed(shape):
-            if stride:
-                stride.insert(0, stride[0] * dim)
-            else:
-                stride.insert(0, 1)
+MAX_RANK: int = 4
+
+class View:
+    def __init__(
+        self,
+        shape: Tuple[int, ...],
+        stride: Optional[Tuple[int, ...]] = None,
+        offset: int = 0,
+    ):
+        if len(shape) > MAX_RANK:
+            raise ValueError(f"Rank of the tensor cannot exceed {MAX_RANK}.")
+        self.shape: Tuple[int, ...] = shape
+        self.stride: Tuple[int, ...] = (
+            stride if stride is not None else self._compute_stride(shape)
+        )
+        self.offset: int = offset
+
+    def _compute_stride(self, shape: Tuple[int, ...]) -> Tuple[int, ...]:
+        stride = [1] * len(shape)
+        for i in range(len(shape) - 2, -1, -1):
+            stride[i] = shape[i + 1] * stride[i + 1]
         return tuple(stride)
 
     def _calculate_total_elements(self, shape):
@@ -34,7 +44,9 @@ class View:
                 new_shape_with_minus_one.append(dim)
 
         if inferred_index is not None:
-            inferred_dim = total_elements // self._calculate_total_elements(new_shape_with_minus_one)
+            inferred_dim = total_elements // self._calculate_total_elements(
+                new_shape_with_minus_one
+            )
             new_shape_with_minus_one[inferred_index] = inferred_dim
 
         new_total_elements = self._calculate_total_elements(new_shape_with_minus_one)
@@ -47,11 +59,12 @@ class View:
 
     def permute(self, *dims):
         if len(dims) != len(self.shape):
-            raise ValueError("Invalid permutation, dims should match the number of dimensions.")
+            raise ValueError(
+                "Invalid permutation, dims should match the number of dimensions."
+            )
 
         self.shape = tuple(self.shape[dim] for dim in dims)
         self.stride = tuple(self.stride[dim] for dim in dims)
 
     def __repr__(self):
         return f"View(shape={self.shape}, stride={self.stride}, offset={self.offset})"
-
