@@ -1,4 +1,5 @@
-from typing import Optional, Tuple
+from math import prod
+from typing import List, Optional, Tuple
 
 MAX_RANK: int = 4
 
@@ -24,16 +25,9 @@ class View:
             stride[i] = shape[i + 1] * stride[i + 1]
         return tuple(stride)
 
-    def _calculate_total_elements(self, shape: Tuple[int, ...]) -> int:
-        return (
-            shape[0]
-            if len(shape) == 1
-            else shape[0] * self._calculate_total_elements(shape[1:])
-        )
-
     def reshape(self, shape: Tuple[int, ...]):
-        total_elements = self._calculate_total_elements(self.shape)
-        new_shape_with_minus_one: list[int] = []
+        total_elements = prod(self.shape)
+        new_shape_with_minus_one: List[int] = []
         inferred_index = None
 
         for i, dim in enumerate(shape):
@@ -46,14 +40,12 @@ class View:
                 new_shape_with_minus_one.append(dim)
 
         if inferred_index is not None:
-            inferred_dim = total_elements // self._calculate_total_elements(
-                tuple(new_shape_with_minus_one)
+            inferred_dim = total_elements // prod(
+                new_shape_with_minus_one
             )
             new_shape_with_minus_one[inferred_index] = inferred_dim
 
-        new_total_elements = self._calculate_total_elements(
-            tuple(new_shape_with_minus_one)
-        )
+        new_total_elements = prod(new_shape_with_minus_one)
 
         if total_elements != new_total_elements:
             raise ValueError("Reshape cannot change the total number of elements.")
