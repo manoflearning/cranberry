@@ -55,7 +55,7 @@ class View:
 
     def expand(self, *sizes: int):
         if len(sizes) < len(self.shape):
-            raise ValueError("Expand dimensions must be at least as large as the current shape.")
+            raise ValueError(f"Cannot expand to {sizes}, must have at least {len(self.shape)} dimensions.")
 
         expanded_shape = list(sizes)
         expanded_stride = list(self.stride)
@@ -81,7 +81,7 @@ class View:
     def permute(self, dims: Tuple[int, ...]):
         if len(dims) != len(self.shape):
             raise ValueError(
-                "Invalid permutation, dims should match the number of dimensions."
+                f"Shape {self.shape} and permutation {dims} must have the same length."
             )
 
         self.shape = tuple(self.shape[dim] for dim in dims)

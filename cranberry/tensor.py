@@ -21,7 +21,6 @@ class Tensor:
         self,
         data: Union[float, int, List, np.ndarray, np.float32],
         grad: Optional[np.ndarray] = None,
-        # TODO: remove shape, and replace with View
         shape: Optional[Union[Tuple, Shape]] = None,
         requires_grad: bool = False,
         prev: Optional[Tuple[Tensor, ...]] = None,
