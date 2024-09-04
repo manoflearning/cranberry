@@ -1,91 +1,144 @@
+from __future__ import annotations
+from dataclasses import dataclass
 from math import prod
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 MAX_RANK: int = 4
 
 
+def compute_stride(shape: Tuple[int, ...]) -> Tuple[int, ...]:
+    stride = [1] * len(shape)
+    for i in range(len(shape) - 2, -1, -1):
+        stride[i] = shape[i + 1] * stride[i + 1]
+    return tuple(stride)
+
+
+@dataclass(frozen=True)
 class View:
-    def __init__(
-        self,
+    shape: Tuple[int, ...]
+    stride: Tuple[int, ...]
+    offset: int
+    contiguous: bool
+
+    @staticmethod
+    def create(
         shape: Tuple[int, ...],
         stride: Optional[Tuple[int, ...]] = None,
         offset: int = 0,
-    ):
-        if len(shape) > MAX_RANK:
-            raise ValueError(f"Rank of the tensor cannot exceed {MAX_RANK}.")
-        self.shape: Tuple[int, ...] = shape
-        self.stride: Tuple[int, ...] = (
-            stride if stride is not None else self._compute_stride(shape)
-        )
-        self.offset: int = offset
+        contiguous: bool = True,
+    ) -> View:
+        # TODO: add more assertions
+        assert (
+            len(shape) <= MAX_RANK
+        ), f"{shape=} can't have more than {MAX_RANK} dimensions"
 
-    def _compute_stride(self, shape: Tuple[int, ...]) -> Tuple[int, ...]:
-        stride = [1] * len(shape)
-        for i in range(len(shape) - 2, -1, -1):
-            stride[i] = shape[i + 1] * stride[i + 1]
-        return tuple(stride)
+        if stride is None:
+            stride = compute_stride(shape)
+        return View(shape, stride, offset, contiguous)
 
-    def reshape(self, shape: Tuple[int, ...]):
-        total_elements = prod(self.shape)
-        new_shape_with_minus_one: List[int] = []
-        inferred_index = None
+    def reshape(self, shape: Tuple[int, ...]) -> Optional[View]:
+        if self.shape == shape:
+            return self
 
-        for i, dim in enumerate(shape):
-            if dim == -1:
-                if inferred_index is not None:
-                    raise ValueError("Only one dimension can be inferred")
-                inferred_index = i
-                new_shape_with_minus_one.append(1)
-            else:
-                new_shape_with_minus_one.append(dim)
+        assert all(x >= 0 for x in shape), f"{shape=} can't contain negative numbers"
+        assert prod(self.shape) == prod(
+            shape
+        ), f"size mismatched, can't reshape {self.shape=} -> {shape=}"
+        assert (
+            len(shape) <= MAX_RANK
+        ), f"{shape=} can't have more than {MAX_RANK} dimensions"
 
-        if inferred_index is not None:
-            inferred_dim = total_elements // prod(
-                new_shape_with_minus_one
+        if not self.contiguous:
+            raise NotImplementedError(
+                "reshaping non-contiguous views is not supported yet"
             )
-            new_shape_with_minus_one[inferred_index] = inferred_dim
+        return View.create(shape)
 
-        new_total_elements = prod(new_shape_with_minus_one)
+        # total_elements = prod(self.shape)
+        # new_shape_with_minus_one: List[int] = []
+        # inferred_index = None
 
-        if total_elements != new_total_elements:
-            raise ValueError("Reshape cannot change the total number of elements.")
+        # for i, dim in enumerate(shape):
+        #     if dim == -1:
+        #         if inferred_index is not None:
+        #             raise ValueError("Only one dimension can be inferred")
+        #         inferred_index = i
+        #         new_shape_with_minus_one.append(1)
+        #     else:
+        #         new_shape_with_minus_one.append(dim)
 
-        self.shape = tuple(new_shape_with_minus_one)
-        self.stride = self._compute_stride(self.shape)
+        # if inferred_index is not None:
+        #     inferred_dim = total_elements // prod(new_shape_with_minus_one)
+        #     new_shape_with_minus_one[inferred_index] = inferred_dim
 
-    def expand(self, *sizes: int):
-        if len(sizes) < len(self.shape):
-            raise ValueError(f"Cannot expand to {sizes}, must have at least {len(self.shape)} dimensions.")
+        # new_total_elements = prod(new_shape_with_minus_one)
 
-        expanded_shape = list(sizes)
-        expanded_stride = list(self.stride)
+        # if total_elements != new_total_elements:
+        #     raise ValueError("Reshape cannot change the total number of elements.")
 
-        # Expand dimensions
+        # self.shape = tuple(new_shape_with_minus_one)
+        # self.stride = compute_stride(self.shape)
+
+    def expand(self, sizes: Tuple[int]) -> View:
+        assert all(
+            x >= 0 for x in sizes
+        ), f"expand {sizes=} can't contain negative numbers"
+        assert (
+            len(sizes) <= MAX_RANK
+        ), f"expand {sizes=} can't have more than {MAX_RANK} dimensions"
+        assert len(sizes) >= len(
+            self.shape
+        ), f"expand {sizes=} must have at least {len(self.shape)} dimensions"
+        assert (
+            (p == 1 and 1 < q) or p == q
+            for p, q in zip(self.shape, sizes[: len(self.shape)])
+        ), f"expand {sizes=} must be compatible with {self.shape=}"
+
+        if not self.contiguous:
+            raise NotImplementedError(
+                "expanding non-contiguous views is not supported yet"
+            )
+
+        n_shape = list(sizes)
+        n_stride = list(self.stride)
+
         for i in range(len(sizes)):
             if i < len(self.shape):
                 if sizes[i] == self.shape[i]:
-                    # No expansion needed
                     continue
-                elif self.shape[i] == 1:
-                    # Expand by repeating along this dimension
-                    expanded_stride[i] = 0  # Means this dimension is "broadcasted"
-                else:
-                    raise ValueError(f"Cannot expand dimension {i}, shape {self.shape[i]} to {sizes[i]}")
+                if sizes[i] != self.shape[i] and self.shape[i] == 1:
+                    n_stride[i] = 0  # means this dimension is "broadcasted"
             else:
-                # New dimensions beyond original shape
-                expanded_stride.append(0)  # New dimension is broadcasted
+                n_stride.append(0)
 
-        self.shape = tuple(expanded_shape)
-        self.stride = tuple(expanded_stride)
+        return View.create(
+            shape=tuple(n_shape),
+            stride=tuple(n_stride),
+            offset=self.offset,
+            contiguous=False,
+        )
 
-    def permute(self, dims: Tuple[int, ...]):
-        if len(dims) != len(self.shape):
-            raise ValueError(
-                f"Shape {self.shape} and permutation {dims} must have the same length."
+    def permute(self, dims: Tuple[int, ...]) -> View:
+        if dims == tuple(range(len(self.shape))):
+            return self
+
+        if not self.contiguous:
+            raise NotImplementedError(
+                "permuting non-contiguous views is not supported yet"
             )
 
-        self.shape = tuple(self.shape[dim] for dim in dims)
-        self.stride = tuple(self.stride[dim] for dim in dims)
+        assert set(dims) == set(
+            range(len(self.shape))
+        ), f"{dims=} must be a permutation of {range(len(self.shape))}"
+
+        return View.create(
+            shape=tuple(self.shape[dim] for dim in dims),
+            stride=tuple(self.stride[dim] for dim in dims),
+            offset=self.offset,
+            contiguous=False,
+        )
 
     def __repr__(self):
-        return f"View(shape={self.shape}, stride={self.stride}, offset={self.offset})"
+        return (
+            f"View({self.shape=}, {self.stride=}, {self.offset=}, {self.contiguous=})"
+        )
