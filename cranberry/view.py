@@ -53,6 +53,31 @@ class View:
         self.shape = tuple(new_shape_with_minus_one)
         self.stride = self._compute_stride(self.shape)
 
+    def expand(self, *sizes: int):
+        if len(sizes) < len(self.shape):
+            raise ValueError("Expand dimensions must be at least as large as the current shape.")
+
+        expanded_shape = list(sizes)
+        expanded_stride = list(self.stride)
+
+        # Expand dimensions
+        for i in range(len(sizes)):
+            if i < len(self.shape):
+                if sizes[i] == self.shape[i]:
+                    # No expansion needed
+                    continue
+                elif self.shape[i] == 1:
+                    # Expand by repeating along this dimension
+                    expanded_stride[i] = 0  # Means this dimension is "broadcasted"
+                else:
+                    raise ValueError(f"Cannot expand dimension {i}, shape {self.shape[i]} to {sizes[i]}")
+            else:
+                # New dimensions beyond original shape
+                expanded_stride.append(0)  # New dimension is broadcasted
+
+        self.shape = tuple(expanded_shape)
+        self.stride = tuple(expanded_stride)
+
     def permute(self, dims: Tuple[int, ...]):
         if len(dims) != len(self.shape):
             raise ValueError(
