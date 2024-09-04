@@ -28,9 +28,7 @@ class View:
         contiguous: bool = True,
     ) -> View:
         # TODO: add more assertions
-        assert (
-            len(shape) <= MAX_RANK
-        ), f"{shape=} can't have more than {MAX_RANK} dimensions"
+        assert len(shape) <= MAX_RANK, f"{shape=} can't have more than {MAX_RANK} dimensions"
 
         if stride is None:
             stride = compute_stride(shape)
@@ -41,17 +39,11 @@ class View:
             return self
 
         assert all(x >= 0 for x in shape), f"{shape=} can't contain negative numbers"
-        assert prod(self.shape) == prod(
-            shape
-        ), f"size mismatched, can't reshape {self.shape=} -> {shape=}"
-        assert (
-            len(shape) <= MAX_RANK
-        ), f"{shape=} can't have more than {MAX_RANK} dimensions"
+        assert prod(self.shape) == prod(shape), f"size mismatched, can't reshape {self.shape=} -> {shape=}"
+        assert len(shape) <= MAX_RANK, f"{shape=} can't have more than {MAX_RANK} dimensions"
 
         if not self.contiguous:
-            raise NotImplementedError(
-                "reshaping non-contiguous views is not supported yet"
-            )
+            raise NotImplementedError("reshaping non-contiguous views is not supported yet")
         return View.create(shape)
 
         # total_elements = prod(self.shape)
@@ -80,24 +72,15 @@ class View:
         # self.stride = compute_stride(self.shape)
 
     def expand(self, sizes: Tuple[int]) -> View:
-        assert all(
-            x >= 0 for x in sizes
-        ), f"expand {sizes=} can't contain negative numbers"
+        assert all(x >= 0 for x in sizes), f"expand {sizes=} can't contain negative numbers"
+        assert len(sizes) <= MAX_RANK, f"expand {sizes=} can't have more than {MAX_RANK} dimensions"
+        assert len(sizes) >= len(self.shape), f"expand {sizes=} must have at least {len(self.shape)} dimensions"
         assert (
-            len(sizes) <= MAX_RANK
-        ), f"expand {sizes=} can't have more than {MAX_RANK} dimensions"
-        assert len(sizes) >= len(
-            self.shape
-        ), f"expand {sizes=} must have at least {len(self.shape)} dimensions"
-        assert (
-            (p == 1 and 1 < q) or p == q
-            for p, q in zip(self.shape, sizes[: len(self.shape)])
+            (p == 1 and 1 < q) or p == q for p, q in zip(self.shape, sizes[: len(self.shape)])
         ), f"expand {sizes=} must be compatible with {self.shape=}"
 
         if not self.contiguous:
-            raise NotImplementedError(
-                "expanding non-contiguous views is not supported yet"
-            )
+            raise NotImplementedError("expanding non-contiguous views is not supported yet")
 
         n_shape = list(sizes)
         n_stride = list(self.stride)
@@ -123,13 +106,9 @@ class View:
             return self
 
         if not self.contiguous:
-            raise NotImplementedError(
-                "permuting non-contiguous views is not supported yet"
-            )
+            raise NotImplementedError("permuting non-contiguous views is not supported yet")
 
-        assert set(dims) == set(
-            range(len(self.shape))
-        ), f"{dims=} must be a permutation of {range(len(self.shape))}"
+        assert set(dims) == set(range(len(self.shape))), f"{dims=} must be a permutation of {range(len(self.shape))}"
 
         return View.create(
             shape=tuple(self.shape[dim] for dim in dims),
@@ -139,6 +118,4 @@ class View:
         )
 
     def __repr__(self):
-        return (
-            f"View({self.shape=}, {self.stride=}, {self.offset=}, {self.contiguous=})"
-        )
+        return f"View({self.shape=}, {self.stride=}, {self.offset=}, {self.contiguous=})"
