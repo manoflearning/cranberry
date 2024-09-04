@@ -7,9 +7,7 @@ from cranberry.features.datasets import mnist
 X_train, Y_train, X_test, Y_test = mnist()
 X_train, X_test = X_train.flatten(1), X_test.flatten(1)
 
-model = nn.Sequential(
-    nn.Linear(784, 128), nn.ReLU(), nn.Linear(128, 64), nn.ReLU(), nn.Linear(64, 10)
-)
+model = nn.Sequential(nn.Linear(784, 128), nn.ReLU(), nn.Linear(128, 64), nn.ReLU(), nn.Linear(64, 10))
 
 optimizer = optim.SGD(model.parameters(), lr=0.001)  # TODO: use Adam
 

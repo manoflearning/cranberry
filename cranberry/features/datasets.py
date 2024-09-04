@@ -12,9 +12,7 @@ from psutil import OSX
 from tqdm import tqdm
 from cranberry import Tensor
 
-_cache_dir: str = getenv(
-    "XDG_CACHE_HOME", os.path.expanduser("~/Library/Caches" if OSX else "~/.cache")
-)
+_cache_dir: str = getenv("XDG_CACHE_HOME", os.path.expanduser("~/Library/Caches" if OSX else "~/.cache"))
 
 
 def fetch(
@@ -43,9 +41,7 @@ def fetch(
                     progress_bar.update(f.write(chunk))
                 f.close()
                 if (file_size := os.stat(f.name).st_size) < total_length:
-                    raise RuntimeError(
-                        f"fetch size incomplete, {file_size} < {total_length}"
-                    )
+                    raise RuntimeError(f"fetch size incomplete, {file_size} < {total_length}")
                 pathlib.Path(f.name).rename(fp)
     return fp
 
@@ -53,9 +49,7 @@ def fetch(
 def _fetch_mnist(file, offset):
     return Tensor(
         np.frombuffer(
-            gzip.open(
-                fetch("https://storage.googleapis.com/cvdf-datasets/mnist/" + file)
-            ).read()[offset:],
+            gzip.open(fetch("https://storage.googleapis.com/cvdf-datasets/mnist/" + file)).read()[offset:],
             dtype=np.uint8,
         )
     )
