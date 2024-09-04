@@ -680,9 +680,7 @@ class TestCranberry(unittest.TestCase):
             A = torch.tensor(A_np, requires_grad=True)
             W = torch.tensor(C_np)
             b = torch.tensor(E_np)
-            out = torch.nn.functional.linear(
-                A, W.transpose(1, 0), b
-            ).sum()  # transpose to match cranberry
+            out = torch.nn.functional.linear(A, W.transpose(1, 0), b).sum()  # transpose to match cranberry
             out.backward()
             assert A.grad is not None
             return out.detach().numpy(), A.grad.detach().numpy()
