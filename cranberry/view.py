@@ -71,7 +71,7 @@ class View:
         # self.shape = tuple(new_shape_with_minus_one)
         # self.stride = compute_stride(self.shape)
 
-    def expand(self, sizes: Tuple[int]) -> View:
+    def expand(self, sizes: Tuple[int, ...]) -> View:
         assert all(x >= 0 for x in sizes), f"expand {sizes=} can't contain negative numbers"
         assert len(sizes) <= MAX_RANK, f"expand {sizes=} can't have more than {MAX_RANK} dimensions"
         assert len(sizes) >= len(self.shape), f"expand {sizes=} must have at least {len(self.shape)} dimensions"
