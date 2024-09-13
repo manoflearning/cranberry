@@ -11,8 +11,6 @@ A lightweight deep learning framework in Rust and Python
     <a href="https://github.com/manoflearning/cranberry/stargazers">
         <img src="https://img.shields.io/github/stars/manoflearning/cranberry" alt="github repo stars">
     </a>
-</p>
-<p align="center">
     <a href="https://discord.gg/DKqZGpPJDV">
         <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/DKqZGpPJDV" alt="discord server">
     </a>
