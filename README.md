@@ -6,13 +6,13 @@ A lightweight deep learning framework in Rust and Python
 
 <p align="center">
     <a href="https://discord.gg/DKqZGpPJDV">
-        <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/DKqZGpPJDV" alt="discord server">
+        <img src="https://dcbadge.vercel.app/api/server/DKqZGpPJDV" alt="Discord" height="22">
     </a>
     <a href="https://github.com/manoflearning/cranberry/actions/workflows/main.yaml">
-        <img src="https://github.com/manoflearning/cranberry/actions/workflows/main.yaml/badge.svg" alt="unit tests">
+        <img src="https://github.com/manoflearning/cranberry/actions/workflows/main.yaml/badge.svg" alt="Unit Tests" height="22">
     </a>
     <a href="https://github.com/manoflearning/cranberry/stargazers">
-        <img src="https://img.shields.io/github/stars/manoflearning/cranberry" alt="github repo stars">
+        <img src="https://img.shields.io/github/stars/manoflearning/cranberry" alt="GitHub Stars" height="22">
     </a>
 </p>
 
