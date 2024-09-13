@@ -17,7 +17,7 @@ pyright = "^1.1.372"
 ruff = "^0.5.4"
 pytest = "^8.3.1"
 torch = "^2.3.1"
-maturin = "^1.7.0"
+maturin = "^1.7.1"
 
 [tool.ruff]
 line-length = 120
@@ -28,7 +28,7 @@ build-backend = "maturin"
 
 [project]
 name = "cranberry"
-version = "0.1.1"
+version = "0.1.2"
 description = ""
 authors = [ {name = "Wookyung Jeong", email = "77jwk0724@gmail.com"} ]
 requires-python = "~=3.11"
