@@ -18,9 +18,6 @@ A lightweight deep learning framework in Rust and Python
     </a>
 </p>
 
-
-## Overview
-
 Cranberry is a deep learning framework designed for efficiency and simplicity. It combines the performance of Rust with the flexibility of Python to create a powerful yet concise tool for machine learning practitioners and researchers.
 
 ### Current Status
@@ -43,7 +40,6 @@ git clone https://github.com/manoflearning/cranberry.git
 cd cranberry
 pip install poetry
 poetry install
-poetry run maturin develop
 ```
 
 ### Usage and Examples
@@ -76,9 +72,4 @@ For more examples, see the [examples](./examples) directory.
 ## Contributing and Community
 
 We welcome contributions to help Cranberry grow into a fully-featured, production-ready deep learning framework.
-
-Join our [Discord server](https://discord.gg/DKqZGpPJDV) to discuss development, get help, or just hang out with us.
-
-## License
-
-Cranberry is released under the MIT License.
+Also, join our [Discord server](https://discord.gg/DKqZGpPJDV) to discuss development, get help, or just hang out with us.
