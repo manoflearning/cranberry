@@ -16,7 +16,7 @@ A lightweight deep learning framework in Rust and Python
     </a>
 </p>
 
-Cranberry is a deep learning framework designed for efficiency and simplicity. It combines the performance of Rust with the flexibility of Python to create a powerful yet concise tool for machine learning practitioners and researchers.
+Cranberry is a deep learning framework in Rust and Python. It combines the performance of Rust with the flexibility of Python to create a powerful yet concise tool for machine learning practitioners and researchers.
 
 ### Current Status
 
