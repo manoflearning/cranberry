@@ -212,7 +212,7 @@ fn test_storage_sum() {
         let mut b = Storage::new(0.0, vec_size, DEVICE);
         Storage::sum(&a, &mut b, idx_1, idx_2, size);
 
-        assert!((y[idx_2] - b.get_items(idx_2, 1)[0]).abs() < 1e-5 * y[idx_2].abs()); // not sure this is right
+        assert!((y[idx_2] - b.get_items(idx_2, 1)[0]).abs() < 1e-5 * y[idx_2].abs());
     }
 }
 #[test]
