@@ -4,12 +4,12 @@ mod cpu_backend;
 #[cfg(test)]
 mod tests;
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Storage {
     data: Vec<f32>,
     data_size: usize,
     device: Device,
-    ref_count: i32,
+    // ref_count: i32,
 }
 
 impl Storage {
@@ -18,7 +18,7 @@ impl Storage {
             data: vec![value; size],
             data_size: size,
             device: Device::from_str(device),
-            ref_count: 1,
+            // ref_count: 1,
         }
     }
     pub fn from_vec(vec: Vec<f32>, device: &str) -> Self {
@@ -26,28 +26,31 @@ impl Storage {
             data_size: vec.len(),
             data: vec,
             device: Device::from_str(device),
-            ref_count: 1,
+            // ref_count: 1,
         }
     }
-    #[inline(always)]
-    pub fn incref(&mut self) {
-        assert!(0 < self.ref_count);
-        self.ref_count += 1;
+    pub fn to_vec(&self) -> Vec<f32> {
+        self.data.clone()
     }
-    #[inline(always)]
-    pub fn decref(&mut self) {
-        assert!(0 < self.ref_count);
-        self.ref_count -= 1;
-        if self.ref_count == 0 {
-            // You might wonder why we manually drop the memory here,
-            // instead of letting the Rust compiler handle it.
-            // The reason is that this is the library code binding to the Python interpreter.
-            // The Rust compiler does not know when the Python interpreter will release the memory.
-            // Therefore, we need to manually drop the memory when the reference count is zero.
-            self.data.clear();
-            self.data.shrink_to_fit();
-        }
-    }
+    // #[inline(always)]
+    // pub fn incref(&mut self) {
+    //     assert!(0 < self.ref_count);
+    //     self.ref_count += 1;
+    // }
+    // #[inline(always)]
+    // pub fn decref(&mut self) {
+    //     assert!(0 < self.ref_count);
+    //     self.ref_count -= 1;
+    //     if self.ref_count == 0 {
+    //         // You might wonder why we manually drop the memory here,
+    //         // instead of letting the Rust compiler handle it.
+    //         // The reason is that this is the library code binding to the Python interpreter.
+    //         // The Rust compiler does not know when the Python interpreter will release the memory.
+    //         // Therefore, we need to manually drop the memory when the reference count is zero.
+    //         self.data.clear();
+    //         self.data.shrink_to_fit();
+    //     }
+    // }
     pub fn get_items(&self, idx: usize, size: usize) -> &[f32] {
         assert!(0 < size);
         assert!(idx + size <= self.data_size);

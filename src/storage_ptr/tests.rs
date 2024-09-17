@@ -1,4 +1,4 @@
-use crate::storage::Storage;
+use crate::storage_ptr::StoragePtr;
 use rand::random;
 
 const DEVICE: &str = "cpu";
@@ -6,7 +6,7 @@ const MAX_VEC_SIZE: usize = 4000;
 const DEFAULT_TEST_COUNT: usize = 10;
 
 #[test]
-fn test_storage_neg() {
+fn test_storage_ptr_neg() {
     for _ in 0..DEFAULT_TEST_COUNT {
         let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
@@ -20,15 +20,15 @@ fn test_storage_neg() {
             y[idx_2 + i] = -x[idx_1 + i];
         }
 
-        let a = Storage::from_vec(x.clone(), DEVICE);
-        let mut b = Storage::new(0.0, vec_size, DEVICE);
-        Storage::neg(&a, &mut b, idx_1, idx_2, size);
+        let a = StoragePtr::from_vec(x.clone(), DEVICE);
+        let b = StoragePtr::full(0.0, vec_size, DEVICE);
+        StoragePtr::neg(&a, &b, idx_1, idx_2, size);
 
-        assert!(y.as_slice() == b.get_items(0, vec_size));
+        assert_eq!(b.to_vec(), y);
     }
 }
 #[test]
-fn test_storage_sqrt() {
+fn test_storage_ptr_sqrt() {
     for _ in 0..DEFAULT_TEST_COUNT {
         let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
@@ -42,15 +42,15 @@ fn test_storage_sqrt() {
             y[idx_2 + i] = x[idx_1 + i].sqrt();
         }
 
-        let a = Storage::from_vec(x.clone(), DEVICE);
-        let mut b = Storage::new(0.0, vec_size, DEVICE);
-        Storage::sqrt(&a, &mut b, idx_1, idx_2, size);
+        let a = StoragePtr::from_vec(x.clone(), DEVICE);
+        let b = StoragePtr::full(0.0, vec_size, DEVICE);
+        StoragePtr::sqrt(&a, &b, idx_1, idx_2, size);
 
-        assert!(y.as_slice() == b.get_items(0, vec_size));
+        assert_eq!(b.to_vec(), y);
     }
 }
 #[test]
-fn test_storage_exp() {
+fn test_storage_ptr_exp() {
     for _ in 0..DEFAULT_TEST_COUNT {
         let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
@@ -64,15 +64,15 @@ fn test_storage_exp() {
             y[idx_2 + i] = x[idx_1 + i].exp();
         }
 
-        let a = Storage::from_vec(x.clone(), DEVICE);
-        let mut b = Storage::new(0.0, vec_size, DEVICE);
-        Storage::exp(&a, &mut b, idx_1, idx_2, size);
+        let a = StoragePtr::from_vec(x.clone(), DEVICE);
+        let b = StoragePtr::full(0.0, vec_size, DEVICE);
+        StoragePtr::exp(&a, &b, idx_1, idx_2, size);
 
-        assert!(y.as_slice() == b.get_items(0, vec_size));
+        assert_eq!(b.to_vec(), y);
     }
 }
 #[test]
-fn test_storage_log() {
+fn test_storage_ptr_log() {
     for _ in 0..DEFAULT_TEST_COUNT {
         let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
@@ -86,15 +86,15 @@ fn test_storage_log() {
             y[idx_2 + i] = x[idx_1 + i].ln();
         }
 
-        let a = Storage::from_vec(x.clone(), DEVICE);
-        let mut b = Storage::new(0.0, vec_size, DEVICE);
-        Storage::log(&a, &mut b, idx_1, idx_2, size);
+        let a = StoragePtr::from_vec(x.clone(), DEVICE);
+        let b = StoragePtr::full(0.0, vec_size, DEVICE);
+        StoragePtr::log(&a, &b, idx_1, idx_2, size);
 
-        assert!(y.as_slice() == b.get_items(0, vec_size));
+        assert_eq!(b.to_vec(), y);
     }
 }
 #[test]
-fn test_storage_add() {
+fn test_storage_ptr_add() {
     for _ in 0..DEFAULT_TEST_COUNT {
         let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
@@ -110,16 +110,16 @@ fn test_storage_add() {
             z[idx_3 + i] = x[idx_1 + i] + y[idx_2 + i];
         }
 
-        let a = Storage::from_vec(x.clone(), DEVICE);
-        let b = Storage::from_vec(y.clone(), DEVICE);
-        let mut c = Storage::new(0.0, vec_size, DEVICE);
-        Storage::add(&a, &b, &mut c, idx_1, idx_2, idx_3, size);
+        let a = StoragePtr::from_vec(x.clone(), DEVICE);
+        let b = StoragePtr::from_vec(y.clone(), DEVICE);
+        let c = StoragePtr::full(0.0, vec_size, DEVICE);
+        StoragePtr::add(&a, &b, &c, idx_1, idx_2, idx_3, size);
 
-        assert!(y.as_slice() == b.get_items(0, vec_size));
+        assert_eq!(c.to_vec(), z);
     }
 }
 #[test]
-fn test_storage_sub() {
+fn test_storage_ptr_sub() {
     for _ in 0..DEFAULT_TEST_COUNT {
         let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
@@ -135,16 +135,16 @@ fn test_storage_sub() {
             z[idx_3 + i] = x[idx_1 + i] - y[idx_2 + i];
         }
 
-        let a = Storage::from_vec(x.clone(), DEVICE);
-        let b = Storage::from_vec(y.clone(), DEVICE);
-        let mut c = Storage::new(0.0, vec_size, DEVICE);
-        Storage::sub(&a, &b, &mut c, idx_1, idx_2, idx_3, size);
+        let a = StoragePtr::from_vec(x.clone(), DEVICE);
+        let b = StoragePtr::from_vec(y.clone(), DEVICE);
+        let c = StoragePtr::full(0.0, vec_size, DEVICE);
+        StoragePtr::sub(&a, &b, &c, idx_1, idx_2, idx_3, size);
 
-        assert!(y.as_slice() == b.get_items(0, vec_size));
+        assert_eq!(c.to_vec(), z);
     }
 }
 #[test]
-fn test_storage_mul() {
+fn test_storage_ptr_mul() {
     for _ in 0..DEFAULT_TEST_COUNT {
         let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
@@ -160,16 +160,16 @@ fn test_storage_mul() {
             z[idx_3 + i] = x[idx_1 + i] * y[idx_2 + i];
         }
 
-        let a = Storage::from_vec(x.clone(), DEVICE);
-        let b = Storage::from_vec(y.clone(), DEVICE);
-        let mut c = Storage::new(0.0, vec_size, DEVICE);
-        Storage::mul(&a, &b, &mut c, idx_1, idx_2, idx_3, size);
+        let a = StoragePtr::from_vec(x.clone(), DEVICE);
+        let b = StoragePtr::from_vec(y.clone(), DEVICE);
+        let c = StoragePtr::full(0.0, vec_size, DEVICE);
+        StoragePtr::mul(&a, &b, &c, idx_1, idx_2, idx_3, size);
 
-        assert!(y.as_slice() == b.get_items(0, vec_size));
+        assert_eq!(c.to_vec(), z);
     }
 }
 #[test]
-fn test_storage_div() {
+fn test_storage_ptr_div() {
     for _ in 0..DEFAULT_TEST_COUNT {
         let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
@@ -185,16 +185,16 @@ fn test_storage_div() {
             z[idx_3 + i] = x[idx_1 + i] / y[idx_2 + i];
         }
 
-        let a = Storage::from_vec(x.clone(), DEVICE);
-        let b = Storage::from_vec(y.clone(), DEVICE);
-        let mut c = Storage::new(0.0, vec_size, DEVICE);
-        Storage::div(&a, &b, &mut c, idx_1, idx_2, idx_3, size);
+        let a = StoragePtr::from_vec(x.clone(), DEVICE);
+        let b = StoragePtr::from_vec(y.clone(), DEVICE);
+        let c = StoragePtr::full(0.0, vec_size, DEVICE);
+        StoragePtr::div(&a, &b, &c, idx_1, idx_2, idx_3, size);
 
-        assert!(y.as_slice() == b.get_items(0, vec_size));
+        assert_eq!(c.to_vec(), z);
     }
 }
 #[test]
-fn test_storage_sum() {
+fn test_storage_ptr_sum() {
     for _ in 0..DEFAULT_TEST_COUNT {
         let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
@@ -208,15 +208,15 @@ fn test_storage_sum() {
             y[idx_2] += x[idx_1 + i];
         }
 
-        let a = Storage::from_vec(x.clone(), DEVICE);
-        let mut b = Storage::new(0.0, vec_size, DEVICE);
-        Storage::sum(&a, &mut b, idx_1, idx_2, size);
+        let a = StoragePtr::from_vec(x.clone(), DEVICE);
+        let b = StoragePtr::full(0.0, vec_size, DEVICE);
+        StoragePtr::sum(&a, &b, idx_1, idx_2, size);
 
-        assert!((y[idx_2] - b.get_items(idx_2, 1)[0]).abs() < 1e-5 * y[idx_2].abs()); // not sure this is right
+        assert!((y[idx_2] - b.to_vec()[idx_2]).abs() < 1e-5 * y[idx_2].abs());
     }
 }
 #[test]
-fn test_storage_max() {
+fn test_storage_ptr_max() {
     for _ in 0..DEFAULT_TEST_COUNT {
         let vec_size = random::<usize>() % MAX_VEC_SIZE + 1;
 
@@ -233,10 +233,10 @@ fn test_storage_max() {
             }
         }
 
-        let a = Storage::from_vec(x.clone(), DEVICE);
-        let mut b = Storage::new(0.0, vec_size, DEVICE);
-        Storage::max(&a, &mut b, idx_1, idx_2, size);
+        let a = StoragePtr::from_vec(x.clone(), DEVICE);
+        let b = StoragePtr::full(0.0, vec_size, DEVICE);
+        StoragePtr::max(&a, &b, idx_1, idx_2, size);
 
-        assert!(y[idx_2] == b.get_items(idx_2, 1)[0]);
+        assert_eq!(b.to_vec(), y);
     }
 }
