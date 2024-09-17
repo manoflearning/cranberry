@@ -17,9 +17,6 @@ impl StoragePtr {
             storage: Arc::new(Mutex::new(storage)),
         }
     }
-    fn from_storage(storage: Storage) -> StoragePtr {
-        StoragePtr::new(storage)
-    }
     fn get_storage(&self) -> Arc<Mutex<Storage>> {
         Arc::clone(&self.storage)
     }
@@ -29,11 +26,11 @@ impl StoragePtr {
 impl StoragePtr {
     #[staticmethod]
     fn full(value: f32, size: usize, device: &str) -> StoragePtr {
-        StoragePtr::from_storage(Storage::new(value, size, device))
+        StoragePtr::new(Storage::new(value, size, device))
     }
     #[staticmethod]
     fn from_vec(vec: Vec<f32>, device: &str) -> StoragePtr {
-        StoragePtr::from_storage(Storage::from_vec(vec, device))
+        StoragePtr::new(Storage::from_vec(vec, device))
     }
     #[staticmethod]
     fn neg(a: &StoragePtr, b: &StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
