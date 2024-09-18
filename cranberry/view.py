@@ -101,62 +101,62 @@ class View:
 
     raise NotImplementedError
 
-    # Compute the broadcasted shape
-    def broadcast_shapes(shape1: Tuple[int, ...], shape2: Tuple[int, ...]) -> Tuple[int, ...]:
-      result = []
-      len1 = len(shape1)
-      len2 = len(shape2)
-      for i in range(1, max(len1, len2)+1):
-        dim1 = shape1[-i] if i <= len1 else 1
-        dim2 = shape2[-i] if i <= len2 else 1
-        if dim1 == 1 or dim2 == 1 or dim1 == dim2:
-          result.append(max(dim1, dim2))
-        else:
-          raise ValueError(f"Shapes {shape1} and {shape2} are not broadcastable")
-      return tuple(reversed(result))
+    # # Compute the broadcasted shape
+    # def broadcast_shapes(shape1: Tuple[int, ...], shape2: Tuple[int, ...]) -> Tuple[int, ...]:
+    #   result = []
+    #   len1 = len(shape1)
+    #   len2 = len(shape2)
+    #   for i in range(1, max(len1, len2)+1):
+    #     dim1 = shape1[-i] if i <= len1 else 1
+    #     dim2 = shape2[-i] if i <= len2 else 1
+    #     if dim1 == 1 or dim2 == 1 or dim1 == dim2:
+    #       result.append(max(dim1, dim2))
+    #     else:
+    #       raise ValueError(f"Shapes {shape1} and {shape2} are not broadcastable")
+    #   return tuple(reversed(result))
 
-    broadcasted_shape = broadcast_shapes(in1.shape, in2.shape)
-    assert broadcasted_shape == out.shape, f"Output shape {out.shape} does not match broadcasted shape {broadcasted_shape}"
+    # broadcasted_shape = broadcast_shapes(in1.shape, in2.shape)
+    # assert broadcasted_shape == out.shape, f"Output shape {out.shape} does not match broadcasted shape {broadcasted_shape}"
 
-    # Pad shapes and strides
-    def pad_shape_and_stride(shape: Tuple[int, ...], stride: Tuple[int, ...], full_rank: int) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
-      pad_len = full_rank - len(shape)
-      shape_padded = (1,) * pad_len + shape
-      stride_padded = (0,) * pad_len + stride
-      return shape_padded, stride_padded
+    # # Pad shapes and strides
+    # def pad_shape_and_stride(shape: Tuple[int, ...], stride: Tuple[int, ...], full_rank: int) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
+    #   pad_len = full_rank - len(shape)
+    #   shape_padded = (1,) * pad_len + shape
+    #   stride_padded = (0,) * pad_len + stride
+    #   return shape_padded, stride_padded
 
-    full_rank = len(broadcasted_shape)
-    in1_shape_padded, in1_stride_padded = pad_shape_and_stride(in1.shape, in1.stride, full_rank)
-    in2_shape_padded, in2_stride_padded = pad_shape_and_stride(in2.shape, in2.stride, full_rank)
-    out_shape_padded, out_stride_padded = pad_shape_and_stride(out.shape, out.stride, full_rank)
+    # full_rank = len(broadcasted_shape)
+    # in1_shape_padded, in1_stride_padded = pad_shape_and_stride(in1.shape, in1.stride, full_rank)
+    # in2_shape_padded, in2_stride_padded = pad_shape_and_stride(in2.shape, in2.stride, full_rank)
+    # out_shape_padded, out_stride_padded = pad_shape_and_stride(out.shape, out.stride, full_rank)
 
-    # Precompute cumulative products for shape
-    cum_prod = [1] * full_rank
-    for i in range(full_rank - 1, -1, -1):
-      cum_prod[i] = prod(broadcasted_shape[i + 1:]) if i + 1 < full_rank else 1
+    # # Precompute cumulative products for shape
+    # cum_prod = [1] * full_rank
+    # for i in range(full_rank - 1, -1, -1):
+    #   cum_prod[i] = prod(broadcasted_shape[i + 1:]) if i + 1 < full_rank else 1
 
-    indices = []
-    total_size = prod(broadcasted_shape)
-    for idx in range(total_size):
-      idx_remain = idx
-      in1_offset = in1.offset
-      in2_offset = in2.offset
-      out_offset = out.offset
-      for dim in range(full_rank):
-        dim_size = broadcasted_shape[dim]
-        stride1 = in1_stride_padded[dim]
-        stride2 = in2_stride_padded[dim]
-        stride_out = out_stride_padded[dim]
-        dim_idx = idx_remain // cum_prod[dim] if cum_prod[dim] != 0 else 0
-        idx_remain = idx_remain % cum_prod[dim] if cum_prod[dim] != 0 else 0
-        idx1 = dim_idx if in1_shape_padded[dim] != 1 else 0
-        idx2 = dim_idx if in2_shape_padded[dim] != 1 else 0
-        idx_out = dim_idx
-        in1_offset += idx1 * stride1
-        in2_offset += idx2 * stride2
-        out_offset += idx_out * stride_out
-      indices.append((in1_offset, in2_offset, out_offset, 1))
-    return indices
+    # indices = []
+    # total_size = prod(broadcasted_shape)
+    # for idx in range(total_size):
+    #   idx_remain = idx
+    #   in1_offset = in1.offset
+    #   in2_offset = in2.offset
+    #   out_offset = out.offset
+    #   for dim in range(full_rank):
+    #     dim_size = broadcasted_shape[dim]
+    #     stride1 = in1_stride_padded[dim]
+    #     stride2 = in2_stride_padded[dim]
+    #     stride_out = out_stride_padded[dim]
+    #     dim_idx = idx_remain // cum_prod[dim] if cum_prod[dim] != 0 else 0
+    #     idx_remain = idx_remain % cum_prod[dim] if cum_prod[dim] != 0 else 0
+    #     idx1 = dim_idx if in1_shape_padded[dim] != 1 else 0
+    #     idx2 = dim_idx if in2_shape_padded[dim] != 1 else 0
+    #     idx_out = dim_idx
+    #     in1_offset += idx1 * stride1
+    #     in2_offset += idx2 * stride2
+    #     out_offset += idx_out * stride_out
+    #   indices.append((in1_offset, in2_offset, out_offset, 1))
+    # return indices
 
   @property
   def size(self): return prod(self.shape) - self.offset
