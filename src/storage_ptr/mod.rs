@@ -184,10 +184,24 @@ impl StoragePtr {
         let mut b_storage = binding.lock().unwrap();
         Storage::max(&a_storage, &mut b_storage, idx_a, idx_b, size);
     }
+    #[staticmethod]
+    fn assign(a: &StoragePtr, b: &mut StoragePtr) {
+        b.storage = a.storage.clone();
+    }
 
     fn to_vec(&self) -> Vec<f32> {
         let binding = self.get_storage();
         let self_storage = binding.lock().unwrap();
         self_storage.to_vec()
+    }
+    fn device(&self) -> String {
+        let binding = self.get_storage();
+        let self_storage = binding.lock().unwrap();
+        self_storage.device()
+    }
+    fn size(&self) -> usize {
+        let binding = self.get_storage();
+        let self_storage = binding.lock().unwrap();
+        self_storage.size()
     }
 }

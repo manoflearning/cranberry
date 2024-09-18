@@ -5,7 +5,6 @@ from typing import Union
 class UnaryOps(Enum):
   NEG = auto()
   SQRT = auto()
-  RELU = auto()
   EXP = auto()
   LOG = auto()
   def __repr__(self): return f"{self.name.lower()}"

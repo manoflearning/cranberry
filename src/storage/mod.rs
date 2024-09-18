@@ -32,25 +32,12 @@ impl Storage {
     pub fn to_vec(&self) -> Vec<f32> {
         self.data.clone()
     }
-    // #[inline(always)]
-    // pub fn incref(&mut self) {
-    //     assert!(0 < self.ref_count);
-    //     self.ref_count += 1;
-    // }
-    // #[inline(always)]
-    // pub fn decref(&mut self) {
-    //     assert!(0 < self.ref_count);
-    //     self.ref_count -= 1;
-    //     if self.ref_count == 0 {
-    //         // You might wonder why we manually drop the memory here,
-    //         // instead of letting the Rust compiler handle it.
-    //         // The reason is that this is the library code binding to the Python interpreter.
-    //         // The Rust compiler does not know when the Python interpreter will release the memory.
-    //         // Therefore, we need to manually drop the memory when the reference count is zero.
-    //         self.data.clear();
-    //         self.data.shrink_to_fit();
-    //     }
-    // }
+    pub fn device(&self) -> String {
+        self.device.to_string()
+    }
+    pub fn size(&self) -> usize {
+        self.data.len()
+    }
     pub fn get_items(&self, idx: usize, size: usize) -> &[f32] {
         assert!(0 < size);
         assert!(idx + size <= self.data_size);
