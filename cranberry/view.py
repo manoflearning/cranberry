@@ -27,11 +27,8 @@ class View:
     offset: int = 0,
     contiguous: bool = True,
   ) -> View:
-    # TODO: add more assertions
+    if stride is None: stride = compute_stride(shape)
     assert len(shape) <= MAX_RANK, f"{shape=} can't have more than {MAX_RANK} dimensions"
-
-    if stride is None:
-      stride = compute_stride(shape)
     return View(shape, stride, offset, contiguous)
 
   def reshape(self, shape: Tuple[int, ...]) -> Optional[View]:
@@ -41,7 +38,7 @@ class View:
     assert prod(self.shape) == prod(shape), f"size mismatched, can't reshape {self.shape=} -> {shape=}"
     assert len(shape) <= MAX_RANK, f"{shape=} can't have more than {MAX_RANK} dimensions"
 
-    if self.contiguous: return View.create(shape)
+    if self.contiguous: return View.create(shape=shape, offset=self.offset, contiguous=True)
     else:
       raise NotImplementedError("reshaping non-contiguous views is not supported yet")
 
@@ -89,15 +86,15 @@ class View:
       raise NotImplementedError("permuting non-contiguous views is not supported yet")
 
   @staticmethod
-  def unary_op_indexing(in1: View, out: View) -> List[Tuple[int, int, int]]:
+  def compute_unary_op_indices(in1: View, out: View) -> List[Tuple[int, int, int]]:
     assert in1.size == out.size
-    return [[in1.offset, out.offset, in1.size]]
+    return [(in1.offset, out.offset, in1.size)]
 
   @staticmethod
-  def binary_op_indexing(in1: View, in2: View, out: View) -> List[Tuple[int, int, int, int]]:
+  def compute_binary_op_indices(in1: View, in2: View, out: View) -> List[Tuple[int, int, int, int]]:
     if in1.contiguous and in2.contiguous and out.contiguous:
       assert (prod(in1.shape) == prod(in2.shape) and prod(in2.shape) == prod(out.shape))
-      return [[in1.offset, in2.offset, out.offset, prod(in1.shape)]]
+      return [(in1.offset, in2.offset, out.offset, prod(in1.shape))]
 
     raise NotImplementedError
 
@@ -160,6 +157,14 @@ class View:
 
   @property
   def size(self): return prod(self.shape) - self.offset
+
+  @staticmethod
+  def from_list(x: List) -> View:
+    shape = []
+    while isinstance(x, List):
+      shape.append(len(x))
+      x = x[0]
+    return View.create(tuple(shape))
 
   def __repr__(self):
     return f"View({self.shape=}, {self.stride=}, {self.offset=}, {self.contiguous=})"

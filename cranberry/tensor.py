@@ -9,22 +9,6 @@ from cranberry.view import View
 from cranberry import StoragePtr
 
 
-def list_to_size(x: List) -> int:
-  size = 1
-  while isinstance(x, List):
-    size *= len(x)
-    x = x[0]
-  return size
-
-
-def list_to_view(x: List) -> View:
-  shape = []
-  while isinstance(x, List):
-    shape.append(len(x))
-    x = x[0]
-  return View.create(tuple(shape))
-
-
 class Tensor:
   def __init__(
     self,
@@ -71,7 +55,7 @@ class Tensor:
         if isinstance(data, float, int):
           self._view = View.create(())
         elif isinstance(data, List):
-          self._view = list_to_view(data)
+          self._view = View.from_list(data)
         elif isinstance(data, np.ndarray):
           self._view = View.create(data.shape)
         elif type(data) is np.float32:
@@ -103,7 +87,7 @@ class Tensor:
     assert self._view == other._view, f"assign view mismatch {self._view} != {other._view}"
     assert self._data.device == other._data.device, f"assign device mismatch {self._data.device} != {other._data.device}"
     StoragePtr.assign(other._data, self._data)
-    self
+    return self
 
   # ********************************************************
   # ***************      backward prop       ***************
@@ -111,7 +95,7 @@ class Tensor:
 
   def backward(self):
     assert self._requires_grad, "cannot call backward on a tensor that doesn't require gradients"
-    assert self.shape == tuple(), f"backward can only be called for scalar tensors, but it has shape {self.shape})"
+    assert self._view.shape == tuple(), f"backward can only be called for scalar tensors, but it has shape {self._view.shape})"
 
     topo = []
     visited = set()
@@ -141,10 +125,8 @@ class Tensor:
     while len(shape2) < len(shape1):
       shape2 = (1,) + shape2
     shape = tuple(max(s1, s2) for s1, s2 in zip(shape1, shape2))
-    if self.shape != shape:
-      self = self.expand(*shape)
-    if other.shape != shape:
-      other = other.expand(*shape)
+    if self.shape != shape: self = self.expand(*shape)
+    if other.shape != shape: other = other.expand(*shape)
     return self, other
 
   # ********************************************************
@@ -161,7 +143,7 @@ class Tensor:
       device=self._device,
     )
 
-    idxs = View.unary_op_indexing(self._view, out._view)
+    idxs = View.compute_unary_op_indices(self._view, out._view)
 
     match op:
       case UnaryOps.NEG:
@@ -216,7 +198,7 @@ class Tensor:
       device=self._data.device,
     )
 
-    idxs = View.binary_op_indexing(self._view, other._view, out._view)
+    idxs = View.compute_binary_op_indices(self._view, other._view, out._view)
 
     match op:
       case BinaryOps.ADD:
