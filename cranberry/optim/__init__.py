@@ -3,28 +3,28 @@ from typing import List
 
 
 class SGD:
-    def __init__(self, params: List[Tensor], lr: float):
-        # if it's False, but being put into an optimizer, set it to True
-        for x in params:
-            if x._requires_grad is False:
-                x._requires_grad = True
-        self._params, self._lr = params, lr
+  def __init__(self, params: List[Tensor], lr: float):
+    # if it's False, but being put into an optimizer, set it to True
+    for x in params:
+      if x._requires_grad is False:
+        x._requires_grad = True
+    self._params, self._lr = params, lr
 
-    def zero_grad(self):
-        for p in self._params:
-            p._grad.fill(0.0)
+  def zero_grad(self):
+    for p in self._params:
+      p._grad.fill(0.0)
 
-    def step(self):
-        for p in self._params:
-            p._data -= self._lr * p._grad
+  def step(self):
+    for p in self._params:
+      p._data -= self._lr * p._grad
 
-    @property
-    def lr(self):
-        return self._lr
+  @property
+  def lr(self):
+    return self._lr
 
-    @lr.setter
-    def lr(self, lr: float):
-        self._lr = lr
+  @lr.setter
+  def lr(self, lr: float):
+    self._lr = lr
 
 
 # https://pytorch.org/docs/stable/generated/torch.optim.Adam.html

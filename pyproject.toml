@@ -5,23 +5,6 @@ authors = ["Wookyung Jeong <77jwk0724@gmail.com>"]
 readme = "README.md"
 description = ""
 
-[tool.poetry.dependencies]
-python = "~3.11"
-numpy = "^2.0"
-graphviz = "^0.20.3"
-psutil = "^6.0.0"
-tqdm = "^4.66.4"
-
-[tool.poetry.group.dev.dependencies]
-pyright = "^1.1.372"
-ruff = "^0.5.4"
-pytest = "^8.3.1"
-torch = "^2.3.1"
-maturin = "^1.7.1"
-
-[tool.ruff]
-line-length = 120
-
 [build-system]
 requires = ["maturin>=0.13"]
 build-backend = "maturin"
@@ -38,3 +21,17 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
+
+[tool.poetry.dependencies]
+python = "~3.11"
+numpy = "^2.0"
+graphviz = "^0.20.3"
+psutil = "^6.0.0"
+tqdm = "^4.66.4"
+
+[tool.poetry.group.dev.dependencies]
+pyright = "^1.1.372"
+ruff = "^0.5.4"
+pytest = "^8.3.1"
+torch = "^2.3.1"
+maturin = "^1.7.1"
