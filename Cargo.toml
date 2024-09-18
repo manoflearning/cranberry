@@ -7,14 +7,13 @@ edition = "2021"
 name = "cranberry"
 crate-type = ["cdylib"]
 
+[dependencies]
+pyo3 = { version = "0.22.2", features = ["extension-module"] }
+rand = { version = "0.8.5" }
+
 [features]
 abi3 = ["pyo3/abi3-py37", "generate-import-lib"]
 generate-import-lib = ["pyo3/generate-import-lib"]
-
-[dependencies]
-pyo3 = { version = "^0.22.2", features = ["extension-module"] }
-uuid = { version = "^1.10.0", features = [ "v4", "fast-rng", "macro-diagnostics"] }
-rand = { version = "0.8.5" }
 
 [profile.release]
 opt-level = 3
