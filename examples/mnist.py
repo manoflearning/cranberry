@@ -12,14 +12,14 @@ model = nn.Sequential(nn.Linear(784, 128), nn.ReLU(), nn.Linear(128, 64), nn.ReL
 optimizer = optim.SGD(model.parameters(), lr=0.001)  # TODO: use Adam
 
 for i in range(100):
-    optimizer.zero_grad()
-    # forward
-    loss = model(X_train).sparse_categorical_crossentropy(Y_train)
-    # backward
-    loss.backward()
-    # update
-    optimizer.step()
+  optimizer.zero_grad()
+  # forward
+  loss = model(X_train).sparse_categorical_crossentropy(Y_train)
+  # backward
+  loss.backward()
+  # update
+  optimizer.step()
 
-    print(f"epoch {i}, loss {loss.item():.4f}")
+  print(f"epoch {i}, loss {loss.item():.4f}")
 
 # TODO: evaluate on test set
