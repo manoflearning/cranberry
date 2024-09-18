@@ -179,6 +179,26 @@ impl Storage {
             Device::Cuda => todo!(),
         }
     }
+    pub fn cmplt(
+        a: &Storage,
+        b: &Storage,
+        c: &mut Storage,
+        idx_a: usize,
+        idx_b: usize,
+        idx_c: usize,
+        size: usize,
+    ) {
+        assert!(a.device == b.device && b.device == c.device);
+        match a.device {
+            Device::Cpu => cpu_backend::binary_ops::cmplt(
+                a.get_items(idx_a, size),
+                b.get_items(idx_b, size),
+                c.get_items_mut(idx_c, size),
+            ),
+            Device::Metal => todo!(),
+            Device::Cuda => todo!(),
+        }
+    }
     #[inline(always)]
     pub fn sum(a: &Storage, b: &mut Storage, idx_a: usize, idx_b: usize, size: usize) {
         assert!(a.device == b.device);

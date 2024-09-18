@@ -169,6 +169,32 @@ impl StoragePtr {
         );
     }
     #[staticmethod]
+    fn cmplt(
+        a: &StoragePtr,
+        b: &StoragePtr,
+        c: &StoragePtr,
+        idx_a: usize,
+        idx_b: usize,
+        idx_c: usize,
+        size: usize,
+    ) {
+        let binding = a.get_storage();
+        let a_storage = binding.lock().unwrap();
+        let binding = b.get_storage();
+        let b_storage = binding.lock().unwrap();
+        let binding = c.get_storage();
+        let mut c_storage = binding.lock().unwrap();
+        Storage::cmplt(
+            &a_storage,
+            &b_storage,
+            &mut c_storage,
+            idx_a,
+            idx_b,
+            idx_c,
+            size,
+        );
+    }
+    #[staticmethod]
     fn sum(a: &StoragePtr, b: &StoragePtr, idx_a: usize, idx_b: usize, size: usize) {
         let binding = a.get_storage();
         let a_storage = binding.lock().unwrap();
