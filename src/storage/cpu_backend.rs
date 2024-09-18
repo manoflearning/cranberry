@@ -73,7 +73,10 @@ pub mod unary_ops {
 }
 
 pub mod binary_ops {
-    use std::{ops::{Add, Div, Mul, Sub}, simd::{cmp::SimdPartialOrd, num::SimdInt}};
+    use std::{
+        ops::{Add, Div, Mul, Sub},
+        simd::{cmp::SimdPartialOrd, num::SimdInt},
+    };
 
     use super::*;
     #[inline(always)]
@@ -175,7 +178,7 @@ pub mod binary_ops {
     #[inline(always)]
     pub fn cmplt(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
-        
+
         a.array_chunks::<CHUNK_SIZE>()
             .map(|a| f32x64::from_slice(a))
             .zip(
@@ -192,9 +195,7 @@ pub mod binary_ops {
             .iter()
             .zip(&b[remain..])
             .zip(&mut c[remain..])
-            .for_each(|((a, b), c)| {
-                *c = (a < b) as i32 as f32
-            });
+            .for_each(|((a, b), c)| *c = (a < b) as i32 as f32);
     }
 }
 
