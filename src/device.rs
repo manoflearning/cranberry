@@ -15,3 +15,13 @@ impl Device {
         }
     }
 }
+
+impl std::fmt::Display for Device {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Device::Cpu => write!(f, "cpu"),
+            Device::Metal => write!(f, "metal"),
+            Device::Cuda => write!(f, "cuda"),
+        }
+    }
+}
