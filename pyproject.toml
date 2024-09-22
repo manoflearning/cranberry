@@ -23,7 +23,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "~3.11"
+python = "^3.11"
 numpy = "^2.0"
 graphviz = "^0.20.3"
 psutil = "^6.0.0"
