@@ -11,20 +11,16 @@ class SGD:
     self._params, self._lr = params, lr
 
   def zero_grad(self):
-    for p in self._params:
-      p._grad.fill(0.0)
+    for p in self._params: p._grad.fill(0.0)
 
   def step(self):
-    for p in self._params:
-      p._data -= self._lr * p._grad
+    for p in self._params: p._data -= self._lr * p._grad
 
   @property
-  def lr(self):
-    return self._lr
+  def lr(self): return self._lr
 
   @lr.setter
-  def lr(self, lr: float):
-    self._lr = lr
+  def lr(self, lr: float): self._lr = lr
 
 
 # https://pytorch.org/docs/stable/generated/torch.optim.Adam.html

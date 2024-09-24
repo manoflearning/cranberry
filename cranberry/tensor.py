@@ -25,39 +25,38 @@ class Tensor:
     requires_grad: bool = False,
     prev: Optional[Tuple[Tensor, ...]] = None,
     op: Optional[Op] = None,
-  ):  # TODO: dtype, device
+  ):
     # self._data
     if isinstance(data, (float, int)):
       self._data = np.array(data, dtype=np.float32)
-    elif isinstance(data, List):
+    elif isinstance(data, list):
       self._data = np.array(data, dtype=np.float32)
     elif isinstance(data, np.ndarray):
       self._data = data.astype(np.float32)
     elif type(data) is np.float32:
       self._data = np.array(data, dtype=np.float32)
     else:
-      raise ValueError(f"Invalid data type {type(data)}")
+      raise ValueError(f"invalid data type {type(data)}")
 
     # self._grad
-    # TODO: if requires_grad is False, then grad should be None
     self._grad: np.ndarray = grad if grad is not None else np.zeros_like(self._data)
 
     # self._shape
-    if shape is not None:
-      if isinstance(shape, Shape):
-        self._shape = shape
-      elif isinstance(shape, Tuple):
-        self._shape = Shape(shape)
-    elif isinstance(data, (float, int)):
-      self._shape = Shape(())
-    elif isinstance(data, List):
-      self._shape = shape_for_list(data)
-    elif isinstance(data, np.ndarray):
-      self._shape = Shape(data.shape)
-    elif type(data) is np.float32:
-      self._shape = Shape(data.shape)
-    else:
-      raise ValueError(f"Invalid data type {type(data)}")
+    if isinstance(shape, Shape):
+      self._shape = shape
+    elif isinstance(shape, tuple):
+      self._shape = Shape(shape)
+    elif shape is None:
+      if isinstance(data, (float, int)):
+        self._shape = Shape(())
+      elif isinstance(data, list):
+        self._shape = shape_for_list(data)
+      elif isinstance(data, np.ndarray):
+        self._shape = Shape(data.shape)
+      elif type(data) is np.float32:
+        self._shape = Shape(())
+      else:
+        raise ValueError(f"invalid data type {type(data)}")
 
     assert self._shape == Shape(self._data.shape), f"shape {self._shape} must match data shape {self._data.shape}"
     assert self._shape == Shape(self._grad.shape), f"shape {self._shape} must match grad shape {self._grad.shape}"
@@ -119,72 +118,38 @@ class Tensor:
 
   def _unary_op(self, op: UnaryOps) -> Tensor:
     out = Tensor._dummy(shape=self._shape, requires_grad=self.requires_grad, prev=(self,), op=op)
-    if op == UnaryOps.NEG:
-      out._data -= self._data
-
-      def backward():
-        self._grad -= out._grad
-
-      out._backward = backward
-    elif op == UnaryOps.SQRT:
-      out._data = np.sqrt(self._data)
-
-      def backward():
-        self._grad += 0.5 * out._grad / out._data
-
-      out._backward = backward
-    elif op == UnaryOps.RELU:
-      out._data = self._data * (self._data > 0)
-
-      def backward():
-        self._grad += out._grad * (self._data > 0)
-
-      out._backward = backward
-    elif op == UnaryOps.EXP:
-      out._data = np.exp(self._data)
-
-      def backward():
-        self._grad += out._grad * out._data
-
-      out._backward = backward
-    elif op == UnaryOps.LOG:
-      out._data = np.log(self._data)
-
-      def backward():
-        self._grad += out._grad / self._data
-
-      out._backward = backward
-    else:
-      raise RuntimeError(f"Invalid unary op {op}")
+    match op:
+      case UnaryOps.NEG:
+        out._data -= self._data
+        out._backward = lambda: self._grad.__isub__(out._grad)
+      case UnaryOps.SQRT:
+        out._data = np.sqrt(self._data)
+        out._backward = lambda: self._grad.__iadd__(0.5 * out._grad / out._data)
+      case UnaryOps.RELU:
+        out._data = self._data * (self._data > 0)
+        out._backward = lambda: self._grad.__iadd__(out._grad * (self._data > 0))
+      case UnaryOps.EXP:
+        out._data = np.exp(self._data)
+        out._backward = lambda: self._grad.__iadd__(out._grad * out._data)
+      case UnaryOps.LOG:
+        out._data = np.log(self._data)
+        out._backward = lambda: self._grad.__iadd__(out._grad / self._data)
+      case _:
+        raise RuntimeError(f"invalid unary op {op}")
     return out
 
-  def neg(self) -> Tensor:
-    return self._unary_op(UnaryOps.NEG)
+  def neg(self) -> Tensor: return self._unary_op(UnaryOps.NEG)
+  def __neg__(self) -> Tensor: return self.neg()
+  def sqrt(self) -> Tensor: return self._unary_op(UnaryOps.SQRT)
+  def relu(self) -> Tensor: return self._unary_op(UnaryOps.RELU)
+  def exp(self) -> Tensor: return self._unary_op(UnaryOps.EXP)
+  def log(self) -> Tensor: return self._unary_op(UnaryOps.LOG)
 
-  def __neg__(self) -> Tensor:
-    return self.neg()
-
-  def sqrt(self) -> Tensor:
-    return self._unary_op(UnaryOps.SQRT)
-
-  def relu(self) -> Tensor:
-    return self._unary_op(UnaryOps.RELU)
-
-  def exp(self) -> Tensor:
-    return self._unary_op(UnaryOps.EXP)
-
-  def log(self) -> Tensor:
-    return self._unary_op(UnaryOps.LOG)
-
-  # 1 / (1 + exp(-x)) or exp(x) / (1 + exp(x))
   def sigmoid(self) -> Tensor:
+    # 1 / (1 + exp(-x)) or exp(x) / (1 + exp(x))
     return 1 / (1 + self.neg().exp())
-
   def tanh(self) -> Tensor:
     return (self.exp() - self.neg().exp()) / (self.exp() + self.neg().exp())
-
-  # TODO: gelu sanity check
-
   def gelu(self) -> Tensor:
     return 0.5 * self * (1 + (self * 0.7978845608 * (1 + 0.044715 * self * self)).tanh())
 
@@ -193,11 +158,9 @@ class Tensor:
   # ********************************************************
 
   def _binary_op(self, other: Union[Tensor, int, float], reverse: bool, op: BinaryOps) -> Tensor:
-    if isinstance(other, (int, float)):
-      other = Tensor(other)
+    if isinstance(other, (int, float)): other = Tensor(other)
     self, other = self._broadcasted(other)
-    if reverse:
-      self, other = other, self
+    if reverse: self, other = other, self
 
     out = Tensor._dummy(
       shape=self._shape,
@@ -205,51 +168,42 @@ class Tensor:
       prev=(self, other),
       op=op,
     )
-    if op == BinaryOps.ADD:
-      out._data = self._data + other._data
 
-      def backward():
-        self._grad += out._grad
-        other._grad += out._grad
-
-      out._backward = backward
-    elif op == BinaryOps.SUB:
-      out._data = self._data - other._data
-
-      def backward():
-        self._grad += out._grad
-        other._grad -= out._grad
-
-      out._backward = backward
-    elif op == BinaryOps.MUL:
-      out._data = self._data * other._data
-
-      def backward():
-        self._grad += out._grad * other._data
-        other._grad += out._grad * self._data
-
-      out._backward = backward
-    elif op == BinaryOps.DIV:
-      out._data = self._data / other._data
-
-      def backward():
-        self._grad += out._grad / other._data
-        other._grad -= out._grad * self._data / other._data**2
-
-      out._backward = backward
-    else:
-      raise RuntimeError(f"Invalid binary op {op}")
+    match op:
+      case BinaryOps.ADD:
+        out._data = self._data + other._data
+        out._backward = lambda: (
+          self._grad.__iadd__(out._grad),
+          other._grad.__iadd__(out._grad),
+        )
+      case BinaryOps.SUB:
+        out._data = self._data - other._data
+        out._backward = lambda: (
+          self._grad.__iadd__(out._grad),
+          other._grad.__isub__(out._grad),
+        )
+      case BinaryOps.MUL:
+        out._data = self._data * other._data
+        out._backward = lambda: (
+          self._grad.__iadd__(out._grad * other._data),
+          other._grad.__iadd__(out._grad * self._data),
+        )
+      case BinaryOps.DIV:
+        out._data = self._data / other._data
+        out._backward = lambda: (
+          self._grad.__iadd__(out._grad / other._data),
+          other._grad.__isub__(out._grad * self._data / other._data**2),
+        )
+      case _:
+        raise RuntimeError(f"invalid binary op {op}")
     return out
 
   def add(self, other: Union[Tensor, int, float], reverse: bool = False) -> Tensor:
     return self._binary_op(other, reverse, BinaryOps.ADD)
-
   def sub(self, other: Union[Tensor, int, float], reverse: bool = False) -> Tensor:
     return self._binary_op(other, reverse, BinaryOps.SUB)
-
   def mul(self, other: Union[Tensor, int, float], reverse: bool = False) -> Tensor:
     return self._binary_op(other, reverse, BinaryOps.MUL)
-
   def div(self, other: Union[Tensor, int, float], reverse: bool = False) -> Tensor:
     return self._binary_op(other, reverse, BinaryOps.DIV)
 
@@ -257,6 +211,7 @@ class Tensor:
   def __sub__(self, other) -> Tensor: return self.sub(other)
   def __mul__(self, other) -> Tensor: return self.mul(other)
   def __truediv__(self, other) -> Tensor: return self.div(other)
+
   def __radd__(self, x) -> Tensor: return self.add(x, True)
   def __rsub__(self, x) -> Tensor: return self.sub(x, True)
   def __rmul__(self, other) -> Tensor: return self.mul(other, True)
@@ -270,46 +225,45 @@ class Tensor:
 
   def _reduce_op(self, *args, op: ReduceOps) -> Tensor:
     out = Tensor._dummy(shape=Shape(()), requires_grad=self.requires_grad, prev=(self,), op=op)
-    if op == ReduceOps.SUM:
-      dim, keepdim = args
-      out._data = self._data.sum(axis=dim, keepdims=keepdim)
-      out._grad = np.zeros_like(out._data)
-      out._shape = Shape(out._data.shape) if isinstance(out._data, np.ndarray) else Shape(())
+    match op:
+      case ReduceOps.SUM:
+        dim, keepdim = args
+        out._data = self._data.sum(axis=dim, keepdims=keepdim)
+        out._grad = np.zeros_like(out._data)
+        out._shape = Shape(out._data.shape) if isinstance(out._data, np.ndarray) else Shape(())
 
-      def backward():
-        if dim is None or keepdim:
-          self._grad += out._grad
-        else:
-          o_new_shape = tuple(1 if i == dim else s for i, s in enumerate(self.shape))
-          self._grad += out._grad.reshape(o_new_shape)
+        def backward():
+          if dim is None or keepdim:
+            self._grad += out._grad
+          else:
+            o_new_shape = tuple(1 if i == dim else s for i, s in enumerate(self.shape))
+            self._grad += out._grad.reshape(o_new_shape)
 
-      out._backward = backward
-    elif op == ReduceOps.MAX:
-      dim, keepdim = args
-      out._data = self._data.max(axis=dim, keepdims=keepdim)
-      out._grad = np.zeros_like(out._data)
-      out._shape = Shape(out._data.shape) if isinstance(out._data, np.ndarray) else Shape(())
+        out._backward = backward
+      case ReduceOps.MAX:
+        dim, keepdim = args
+        out._data = self._data.max(axis=dim, keepdims=keepdim)
+        out._grad = np.zeros_like(out._data)
+        out._shape = Shape(out._data.shape) if isinstance(out._data, np.ndarray) else Shape(())
 
-      def backward():
-        if dim is None or keepdim:
-          self._grad += (self._data == out._data) * out._grad
-        else:
-          o_new_shape = tuple(1 if i == dim else s for i, s in enumerate(self.shape))
-          self._grad += (self._data == out._data.reshape(o_new_shape)) * out._grad.reshape(o_new_shape)
+        def backward():
+          if dim is None or keepdim:
+            self._grad += (self._data == out._data) * out._grad
+          else:
+            o_new_shape = tuple(1 if i == dim else s for i, s in enumerate(self.shape))
+            self._grad += (self._data == out._data.reshape(o_new_shape)) * out._grad.reshape(o_new_shape)
 
-      out._backward = backward
-    else:
-      raise RuntimeError(f"Invalid reduce op {op}")
+        out._backward = backward
+      case _:
+        raise RuntimeError(f"invalid reduce op {op}")
     return out
 
-  # TODO: add keepdim
-
   def sum(self, dim: Optional[int] = None, keepdim=False) -> Tensor:
+    # TODO: add keepdim
     return self._reduce_op(dim, keepdim, op=ReduceOps.SUM)
 
-  # different return types than pytorch: https://pytorch.org/docs/stable/generated/torch.max.html
-
   def max(self, dim: Optional[int] = None, keepdim=False) -> Tensor:
+    # different return types than pytorch: https://pytorch.org/docs/stable/generated/torch.max.html
     return self._reduce_op(dim, keepdim, op=ReduceOps.MAX)
 
   def mean(self, dim: Optional[int] = None, keepdim=False):
@@ -343,32 +297,33 @@ class Tensor:
 
   def _movement_op(self, *args, op: MovementOps) -> Tensor:
     out = Tensor._dummy(shape=Shape(args[0]), requires_grad=self.requires_grad, prev=(self,), op=op)
-    if op == MovementOps.RESHAPE:
-      out._data = self._data.reshape(args[0])
-      out._grad = self._grad.reshape(args[0])
+    match op:
+      case MovementOps.RESHAPE:
+        out._data = self._data.reshape(args[0])
+        out._grad = self._grad.reshape(args[0])
 
-      def backward():
-        if out._grad.base is None:  # TODO: initially, out._grad is a view of self._grad, but some reason it becomes a copy
-          self._grad += out._grad.reshape(self.shape)
+        def backward():
+          if out._grad.base is None:  # TODO: initially, out._grad is a view of self._grad, but some reason it becomes a copy
+            self._grad += out._grad.reshape(self.shape)
 
-      out._backward = backward
-    elif op == MovementOps.EXPAND:  # can we make this zero-copy?
-      out._data = np.copy(np.broadcast_to(self._data, args[0]))
-      out._grad = np.copy(np.broadcast_to(self._grad, args[0]))
+        out._backward = backward
+      case MovementOps.EXPAND:
+        out._data = np.copy(np.broadcast_to(self._data, args[0]))
+        out._grad = np.copy(np.broadcast_to(self._grad, args[0]))
 
-      def backward():
-        s_shape, o_shape = self.shape, out.shape
-        while len(s_shape) < len(o_shape):
-          s_shape = (1,) + s_shape
-        axis = tuple(i for i in range(len(o_shape)) if s_shape[i] == 1)
-        self._grad += out._grad.sum(axis=axis, keepdims=True).reshape(self.shape)
+        def backward():
+          s_shape, o_shape = self.shape, out.shape
+          while len(s_shape) < len(o_shape):
+            s_shape = (1,) + s_shape
+          axis = tuple(i for i in range(len(o_shape)) if s_shape[i] == 1)
+          self._grad += out._grad.sum(axis=axis, keepdims=True).reshape(self.shape)
 
-      out._backward = backward
-    elif op == MovementOps.PERMUTE:
-      out._data = self._data.transpose(args[1])
-      out._grad = self._grad.transpose(args[1])
-    else:
-      raise RuntimeError(f"Invalid movement op {op}")
+        out._backward = backward
+      case MovementOps.PERMUTE:
+        out._data = self._data.transpose(args[1])
+        out._grad = self._grad.transpose(args[1])
+      case _:
+        raise RuntimeError(f"invalid movement op {op}")
     return out
 
   def reshape(self, *shape: int) -> Tensor:
@@ -448,11 +403,8 @@ class Tensor:
     else:
       raise RuntimeError(f"Invalid matmul shapes {self.shape} and {other.shape}")
 
-  def dot(self, other: Tensor) -> Tensor:
-    return self.matmul(other)
-
-  def __matmul__(self, other: Tensor) -> Tensor:
-    return self.matmul(other)
+  def dot(self, other: Tensor) -> Tensor: return self.matmul(other)
+  def __matmul__(self, other: Tensor) -> Tensor: return self.matmul(other)
 
   # ********************************************************
   # ***************     functional nn ops    ***************
@@ -480,11 +432,8 @@ class Tensor:
   # ********************************************************
 
   _seed: int = int(time.time())
-
   @staticmethod
-  def manual_seed(seed: int = 0):
-    Tensor._seed = seed
-
+  def manual_seed(seed: int = 0): Tensor._seed = seed
   @staticmethod
   def _nxt_seed() -> int:
     Tensor._seed = (Tensor._seed * 1103515245 + 12345) & 0x7FFFFFFF
@@ -555,41 +504,26 @@ class Tensor:
       op=None,
     )
 
-  def detach(self) -> Tensor:
-    return Tensor(data=self._data, shape=self._shape, requires_grad=False, prev=None, op=None)
-
-  def numpy(self) -> np.ndarray:
-    return self._data
-
+  def detach(self) -> Tensor: return Tensor(data=self._data, shape=self._shape, requires_grad=False, prev=None, op=None)
+  def numpy(self) -> np.ndarray: return self._data
   @property
-  def data(self) -> np.ndarray:
-    return self._data
-
+  def data(self) -> np.ndarray: return self._data
   @property
-  def grad(self) -> np.ndarray:
-    return self._grad
-
+  def grad(self) -> np.ndarray: return self._grad
   @property
-  def shape(self) -> Tuple:
-    return self._shape.dims
-
+  def shape(self) -> Tuple: return self._shape.dims
   @property
-  def requires_grad(self) -> bool:
-    return self._requires_grad
-
+  def requires_grad(self) -> bool: return self._requires_grad
   @property
-  def op(self):
-    return self._op
+  def op(self): return self._op
 
-  def size(self, dim: Optional[int] = None):
-    return self.shape if dim is None else self.shape[dim]
+  def size(self, dim: Optional[int] = None): return self.shape if dim is None else self.shape[dim]
 
   def item(self) -> float:
     assert self._shape == (), f"item() only supports tensors with a single element, but got shape {self.shape}"
     return self._data.item()
 
-  def __hash__(self):
-    return id(self)
+  def __hash__(self): return id(self)
 
   def __repr__(self):
     out = f"Tensor({self.numpy().round(4) if self._shape != () else self.item()}"
