@@ -37,8 +37,9 @@ Cranberry is in its early stages of development but is already functional for ba
 ```bash
 git clone https://github.com/manoflearning/cranberry.git
 cd cranberry
-pip install poetry
-poetry install
+pip install uv
+uv venv
+uv pip install -e '.[dev]'
 ```
 
 ### Usage and Examples
