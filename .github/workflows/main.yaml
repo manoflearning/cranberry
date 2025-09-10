@@ -26,10 +26,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: stable
-          components: clippy, rustfmt
+          toolchain: nightly-2024-08-15
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
 
       - name: Check file formatting
@@ -68,7 +68,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly
+          toolchain: nightly-2024-08-15
       - uses: Swatinem/rust-cache@v2
   
       - name: Run tests
