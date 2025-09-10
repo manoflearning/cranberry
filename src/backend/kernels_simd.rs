@@ -6,7 +6,6 @@ pub mod unary_ops {
     use super::*;
     use std::ops::Neg;
 
-    #[inline(always)]
     pub fn neg(a: &[f32], b: &mut [f32]) {
         assert!(a.len() == b.len());
         let (a_main, a_rem) = a.split_at(a.len() - a.len() % CHUNK_SIZE);
@@ -21,7 +20,6 @@ pub mod unary_ops {
             .for_each(|(a, b)| *b = -a);
     }
 
-    #[inline(always)]
     pub fn sqrt(a: &[f32], b: &mut [f32]) {
         assert!(a.len() == b.len());
         let (a_main, a_rem) = a.split_at(a.len() - a.len() % CHUNK_SIZE);
@@ -36,7 +34,6 @@ pub mod unary_ops {
             .for_each(|(a, b)| *b = a.sqrt());
     }
 
-    #[inline(always)]
     pub fn exp(a: &[f32], b: &mut [f32]) {
         assert!(a.len() == b.len());
         let (a_main, a_rem) = a.split_at(a.len() - a.len() % CHUNK_SIZE);
@@ -51,7 +48,6 @@ pub mod unary_ops {
             .for_each(|(a, b)| *b = a.exp());
     }
 
-    #[inline(always)]
     pub fn log(a: &[f32], b: &mut [f32]) {
         assert!(a.len() == b.len());
         let (a_main, a_rem) = a.split_at(a.len() - a.len() % CHUNK_SIZE);
@@ -71,7 +67,6 @@ pub mod binary_ops {
     use super::*;
     use std::ops::{Add, Div, Mul, Sub};
 
-    #[inline(always)]
     pub fn add(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
         let main = a.len() - a.len() % CHUNK_SIZE;
@@ -94,7 +89,6 @@ pub mod binary_ops {
             .for_each(|((a, b), c)| *c = a + b);
     }
 
-    #[inline(always)]
     pub fn sub(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
         let main = a.len() - a.len() % CHUNK_SIZE;
@@ -117,7 +111,6 @@ pub mod binary_ops {
             .for_each(|((a, b), c)| *c = a - b);
     }
 
-    #[inline(always)]
     pub fn mul(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
         let main = a.len() - a.len() % CHUNK_SIZE;
@@ -140,7 +133,6 @@ pub mod binary_ops {
             .for_each(|((a, b), c)| *c = a * b);
     }
 
-    #[inline(always)]
     pub fn div(a: &[f32], b: &[f32], c: &mut [f32]) {
         assert!(a.len() == b.len() && b.len() == c.len());
         let main = a.len() - a.len() % CHUNK_SIZE;
