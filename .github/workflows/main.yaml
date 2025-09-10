@@ -49,17 +49,16 @@ jobs:
 
       - run: |
           python -m pip install --upgrade pip
-          pip install poetry
-          poetry install
-          poetry run maturin develop
+          pip install uv
+          uv run maturin develop
 
       - name: Ruff
         run: |
-          poetry run ruff check .
+          uv run ruff check .
 
       - name: Pyright
         run: |
-          poetry run pyright
+          uv run pyright
   
   test_rust:
     name: Tests (Rust)
@@ -86,9 +85,8 @@ jobs:
 
       - run: |
           python -m pip install --upgrade pip
-          pip install poetry
-          poetry install
-          poetry run maturin develop
+          pip install uv
+          uv run maturin develop
 
       - run: |
-          poetry run python -m pytest -v
+          uv run python -m pytest -v
