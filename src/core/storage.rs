@@ -19,22 +19,18 @@ impl StorageInner {
         Self { data: vec, device }
     }
 
-    #[inline]
     pub fn len(&self) -> usize {
         self.data.len()
     }
 
-    #[inline]
     pub fn device(&self) -> Device {
         self.device.clone()
     }
 
-    #[inline]
     pub fn as_slice(&self, offset: usize, size: usize) -> &[f32] {
         &self.data[offset..offset + size]
     }
 
-    #[inline]
     pub fn as_mut_slice(&mut self, offset: usize, size: usize) -> &mut [f32] {
         &mut self.data[offset..offset + size]
     }
