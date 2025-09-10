@@ -17,17 +17,16 @@ OSX = sys.platform == "darwin"
 # Optional tqdm progress bar
 try:
   from tqdm import tqdm as _tqdm  # type: ignore
-  def tqdm(*a, **kw):  # noqa: N802 - keep name compatibility
-    return _tqdm(*a, **kw)
+  tqdm = _tqdm  # noqa: N802 - keep name compatibility
 except Exception:  # pragma: no cover - fallback path
   class _NoopTqdm:
     def __init__(self, *a, **kw):
       pass
-    def update(self, n):
+    def update(self, n: int):
       pass
 
-  def tqdm(*a, **kw):  # noqa: N802 - keep name compatibility
-    return _NoopTqdm()
+  # Keep the same callable interface as tqdm
+  tqdm = _NoopTqdm  # noqa: N802 - keep name compatibility
 
 _cache_dir: str = getenv("XDG_CACHE_HOME", os.path.expanduser("~/Library/Caches" if OSX else "~/.cache"))
 
