@@ -36,7 +36,6 @@ impl View {
         }
     }
 
-    #[inline]
     pub fn numel(&self) -> usize {
         self.shape.iter().product()
     }
