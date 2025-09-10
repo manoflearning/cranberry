@@ -28,7 +28,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly-2024-08-15
+          toolchain: nightly
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
 
@@ -68,7 +68,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly-2024-08-15
+          toolchain: nightly
       - uses: Swatinem/rust-cache@v2
   
       - name: Run tests
