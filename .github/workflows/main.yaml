@@ -33,10 +33,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Check file formatting
-        run: cargo fmt --all -- --check
+        run: cargo +stable fmt --all -- --check
   
       - name: Run clippy
-        run: cargo clippy --workspace --all-features
+        run: cargo +stable clippy --workspace --all-features
   
   check_style_python:
     name: Check file formatting and style (Python)
@@ -89,6 +89,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Sync deps
         run: uv sync --locked --dev
-        
+
       - name: Run tests
         run: uv run python -m pytest -v
