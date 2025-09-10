@@ -26,10 +26,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: stable
-          components: clippy, rustfmt
+          toolchain: nightly-2024-08-15
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
 
       - name: Check file formatting
         run: cargo fmt --all -- --check
@@ -43,23 +44,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v2
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: 3.11
-
-      - run: |
-          python -m pip install --upgrade pip
-          pip install poetry
-          poetry install
-          poetry run maturin develop
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.11
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Sync deps
+        run: uv sync --locked --dev
 
       - name: Ruff
-        run: |
-          poetry run ruff check .
+        run: uv run ruff check .
 
       - name: Pyright
-        run: |
-          poetry run pyright
+        run: uv run pyright
   
   test_rust:
     name: Tests (Rust)
@@ -69,7 +68,8 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly
+          toolchain: nightly-2024-08-15
+      - uses: Swatinem/rust-cache@v2
   
       - name: Run tests
         run: cargo test --workspace --all-features
@@ -80,15 +80,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v2
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: 3.11
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.11
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Sync deps
+        run: uv sync --locked --dev
 
-      - run: |
-          python -m pip install --upgrade pip
-          pip install poetry
-          poetry install
-          poetry run maturin develop
-
-      - run: |
-          poetry run python -m pytest -v
+      - name: Run tests
+        run: uv run python -m pytest -v
