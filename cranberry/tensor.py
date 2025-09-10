@@ -520,13 +520,13 @@ class Tensor:
   def size(self, dim: Optional[int] = None): return self.shape if dim is None else self.shape[dim]
 
   def item(self) -> float:
-    assert self._shape == (), f"item() only supports tensors with a single element, but got shape {self.shape}"
+    assert self.shape == (), f"item() only supports tensors with a single element, but got shape {self.shape}"
     return self._data.item()
 
   def __hash__(self): return id(self)
 
   def __repr__(self):
-    out = f"Tensor({self.numpy().round(4) if self._shape != () else self.item()}"
+    out = f"Tensor({self.numpy().round(4) if self.shape != () else self.item()}"
     if self._op is not None:
       out += f", op={self._op.__repr__()}"
     return out + ")"
