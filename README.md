@@ -63,6 +63,12 @@ pip install -e .
 
 Note: Depending on your platform, a local build may be required.
 
+Optional features (extras)
+- Core install includes only `numpy`.
+- Visualization utils require `graphviz` and the Graphviz system binary: `uv pip install -e .[viz]`.
+- Dataset download progress uses `tqdm`: `uv pip install -e .[datasets]`.
+- Install everything optional: `uv pip install -e .[all]`.
+
 ## Quickstart
 
 Minimal example training MNIST with mini‑batches. Tensor slicing is not available yet, so batching uses NumPy views. See `examples/mnist.py` for a complete script.

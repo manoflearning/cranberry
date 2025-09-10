@@ -6,11 +6,27 @@ import pathlib
 import tempfile
 from typing import Optional, Union
 import urllib.request
+import sys
 
 import numpy as np
-from psutil import OSX
-from tqdm import tqdm
 from cranberry import Tensor
+
+# Platform detection without psutil
+OSX = sys.platform == "darwin"
+
+# Optional tqdm progress bar
+try:
+  from tqdm import tqdm as _tqdm  # type: ignore
+  tqdm = _tqdm  # noqa: N802 - keep name compatibility
+except Exception:  # pragma: no cover - fallback path
+  class _NoopTqdm:
+    def __init__(self, *a, **kw):
+      pass
+    def update(self, n: int):
+      pass
+
+  # Keep the same callable interface as tqdm
+  tqdm = _NoopTqdm  # noqa: N802 - keep name compatibility
 
 _cache_dir: str = getenv("XDG_CACHE_HOME", os.path.expanduser("~/Library/Caches" if OSX else "~/.cache"))
 

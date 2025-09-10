@@ -1,5 +1,11 @@
-from graphviz import Digraph
 from cranberry import Tensor
+
+# Defer graphviz requirement until used, with a helpful error
+try:
+  from graphviz import Digraph  # type: ignore
+except ImportError as _gv_err:  # pragma: no cover - informative path
+  Digraph = None  # type: ignore
+  _GRAPHVIZ_IMPORT_ERROR = _gv_err
 
 
 def trace(root: Tensor):
@@ -27,6 +33,12 @@ def plot_graph(root: Tensor, fmt="svg", rankdir="LR"):
   rankdir: TB (top to bottom graph) | LR (left to right)
   """
   assert rankdir in ["LR", "TB"]
+  if Digraph is None:
+    raise ImportError(
+      "graphviz is required for visualization. Install the extra with '\n"
+      "pip install 'cranberry[viz]'\n"
+      "and ensure the Graphviz system binary is installed (brew/apt/choco)."
+    ) from _GRAPHVIZ_IMPORT_ERROR
   nodes, edges = trace(root)
   dot = Digraph(format=fmt, graph_attr={"rankdir": rankdir})
 
