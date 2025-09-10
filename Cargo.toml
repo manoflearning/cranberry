@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 name = "cranberry"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 pyo3 = { version = "0.24.1", features = ["extension-module"] }
