@@ -41,7 +41,6 @@ use crate::core::storage::StorageInner;
 use crate::device::Device;
 
 mod kernels_simd;
-use kernels_simd as kernels;
 
 pub struct CpuBackend;
 
@@ -55,10 +54,10 @@ impl Backend for CpuBackend {
         {
             let out_slice = out_inner.as_mut_slice(0, a.numel());
             match op {
-                UnaryOp::Neg => kernels::unary_ops::neg(a_slice, out_slice),
-                UnaryOp::Sqrt => kernels::unary_ops::sqrt(a_slice, out_slice),
-                UnaryOp::Exp => kernels::unary_ops::exp(a_slice, out_slice),
-                UnaryOp::Log => kernels::unary_ops::log(a_slice, out_slice),
+                UnaryOp::Neg => kernels_simd::unary_ops::neg(a_slice, out_slice),
+                UnaryOp::Sqrt => kernels_simd::unary_ops::sqrt(a_slice, out_slice),
+                UnaryOp::Exp => kernels_simd::unary_ops::exp(a_slice, out_slice),
+                UnaryOp::Log => kernels_simd::unary_ops::log(a_slice, out_slice),
             }
         }
         let mut stride = 1isize;
@@ -89,10 +88,10 @@ impl Backend for CpuBackend {
         {
             let out_slice = out_inner.as_mut_slice(0, a.numel());
             match op {
-                BinaryOp::Add => kernels::binary_ops::add(a_slice, b_slice, out_slice),
-                BinaryOp::Sub => kernels::binary_ops::sub(a_slice, b_slice, out_slice),
-                BinaryOp::Mul => kernels::binary_ops::mul(a_slice, b_slice, out_slice),
-                BinaryOp::Div => kernels::binary_ops::div(a_slice, b_slice, out_slice),
+                BinaryOp::Add => kernels_simd::binary_ops::add(a_slice, b_slice, out_slice),
+                BinaryOp::Sub => kernels_simd::binary_ops::sub(a_slice, b_slice, out_slice),
+                BinaryOp::Mul => kernels_simd::binary_ops::mul(a_slice, b_slice, out_slice),
+                BinaryOp::Div => kernels_simd::binary_ops::div(a_slice, b_slice, out_slice),
             }
         }
         let mut stride = 1isize;
