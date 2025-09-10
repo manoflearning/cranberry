@@ -21,21 +21,6 @@ impl View {
         }
     }
 
-    pub fn new(
-        inner: Arc<StorageInner>,
-        offset: usize,
-        shape: Vec<usize>,
-        strides: Vec<isize>,
-    ) -> Self {
-        debug_assert_eq!(shape.len(), strides.len());
-        Self {
-            inner,
-            offset,
-            shape,
-            strides,
-        }
-    }
-
     pub fn numel(&self) -> usize {
         self.shape.iter().product()
     }

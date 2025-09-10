@@ -14,4 +14,3 @@ fn device_from_str_invalid_panics() {
     });
     assert!(res.is_err());
 }
-

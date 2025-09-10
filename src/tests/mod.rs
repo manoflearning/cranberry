@@ -1,4 +1,3 @@
-mod view;
 mod backend;
 mod device;
-
+mod view;

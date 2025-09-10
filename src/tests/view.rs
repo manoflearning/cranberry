@@ -75,4 +75,3 @@ fn view_reshape_requires_contiguous_panics() {
     });
     assert!(res.is_err());
 }
-

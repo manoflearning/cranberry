@@ -15,7 +15,12 @@ fn unary_neg_matches_scalar() {
     let be = CpuBackend;
     let out = be.unary(UnaryOp::Neg, &a).unwrap();
     let actual = out.inner.as_slice(out.offset, out.numel());
-    let expect: Vec<f32> = a.inner.as_slice(a.offset, a.numel()).iter().map(|x| -*x).collect();
+    let expect: Vec<f32> = a
+        .inner
+        .as_slice(a.offset, a.numel())
+        .iter()
+        .map(|x| -*x)
+        .collect();
     assert_eq!(actual, expect.as_slice());
 }
 
@@ -78,4 +83,3 @@ fn binary_not_contiguous_error() {
     let err = be.binary(BinaryOp::Add, &a_nc, &b).unwrap_err();
     assert!(matches!(err, crate::backend::BackendError::NotContiguous));
 }
-
