@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use crate::backend::{registry, Backend, BackendError, BinaryOp, CudaBackend, UnaryOp};
+#[cfg(feature = "cuda")]
+use crate::backend::CudaBackend;
+use crate::backend::{registry, Backend, BackendError, BinaryOp, UnaryOp};
 use crate::core::{storage::StorageInner, view::View};
 use crate::device::Device;
 
@@ -9,11 +11,13 @@ fn vec_view(v: Vec<f32>) -> View {
     View::from_inner_1d(inner)
 }
 
+#[cfg(feature = "cuda")]
 fn cuda_view(v: Vec<f32>) -> View {
     let inner = Arc::new(StorageInner::from_vec(v, Device::Cuda));
     View::from_inner_1d(inner)
 }
 
+#[cfg(feature = "cuda")]
 fn cuda_backend_or_skip(test_name: &str) -> Option<&'static CudaBackend> {
     match registry::cuda() {
         Ok(be) => Some(be),
@@ -24,6 +28,7 @@ fn cuda_backend_or_skip(test_name: &str) -> Option<&'static CudaBackend> {
     }
 }
 
+#[cfg(feature = "cuda")]
 fn assert_close(got: f32, expected: f32, tol: f32, idx: usize) {
     let diff = (got - expected).abs();
     assert!(
@@ -32,6 +37,7 @@ fn assert_close(got: f32, expected: f32, tol: f32, idx: usize) {
     );
 }
 
+#[cfg(feature = "cuda")]
 fn assert_vec_close(actual: &[f32], expected: &[f32], tol: f32) {
     assert_eq!(actual.len(), expected.len(), "length mismatch");
     for (idx, (got, exp)) in actual.iter().zip(expected.iter()).enumerate() {
@@ -39,6 +45,7 @@ fn assert_vec_close(actual: &[f32], expected: &[f32], tol: f32) {
     }
 }
 
+#[cfg(feature = "cuda")]
 fn run_cuda_unary_case<F>(name: &str, op: UnaryOp, input: &[f32], reference: F)
 where
     F: Fn(f32) -> f32,
@@ -57,6 +64,7 @@ where
     assert_vec_close(actual, expected.as_slice(), 1e-5);
 }
 
+#[cfg(feature = "cuda")]
 fn run_cuda_binary_case<F>(name: &str, op: BinaryOp, lhs: &[f32], rhs: &[f32], reference: F)
 where
     F: Fn(f32, f32) -> f32,
@@ -196,6 +204,20 @@ fn registry_reports_unsupported_device() {
     ));
 }
 
+#[cfg(not(feature = "cuda"))]
+#[test]
+fn registry_reports_cuda_unavailable_when_feature_disabled() {
+    let err = match registry::get(Device::Cuda) {
+        Ok(_) => panic!("expected CUDA backend lookup to fail without feature"),
+        Err(err) => err,
+    };
+    assert!(matches!(
+        err,
+        BackendError::CudaUnavailable(message) if message.contains("`cuda` feature")
+    ));
+}
+
+#[cfg(feature = "cuda")]
 #[test]
 fn cuda_unary_neg_matches_cpu_when_device_available() {
     run_cuda_unary_case(
@@ -206,6 +228,7 @@ fn cuda_unary_neg_matches_cpu_when_device_available() {
     );
 }
 
+#[cfg(feature = "cuda")]
 #[test]
 fn cuda_unary_sqrt_matches_cpu_when_device_available() {
     run_cuda_unary_case(
@@ -216,6 +239,7 @@ fn cuda_unary_sqrt_matches_cpu_when_device_available() {
     );
 }
 
+#[cfg(feature = "cuda")]
 #[test]
 fn cuda_unary_exp_matches_cpu_when_device_available() {
     run_cuda_unary_case(
@@ -226,6 +250,7 @@ fn cuda_unary_exp_matches_cpu_when_device_available() {
     );
 }
 
+#[cfg(feature = "cuda")]
 #[test]
 fn cuda_unary_log_matches_cpu_when_device_available() {
     run_cuda_unary_case(
@@ -236,6 +261,7 @@ fn cuda_unary_log_matches_cpu_when_device_available() {
     );
 }
 
+#[cfg(feature = "cuda")]
 #[test]
 fn cuda_unary_relu_matches_cpu_when_device_available() {
     run_cuda_unary_case(
@@ -246,6 +272,7 @@ fn cuda_unary_relu_matches_cpu_when_device_available() {
     );
 }
 
+#[cfg(feature = "cuda")]
 #[test]
 fn cuda_binary_add_matches_cpu_when_device_available() {
     let lhs: Vec<f32> = (0..64).map(|i| i as f32 * 0.5).collect();
@@ -253,6 +280,7 @@ fn cuda_binary_add_matches_cpu_when_device_available() {
     run_cuda_binary_case("cuda_binary_add", BinaryOp::Add, &lhs, &rhs, |x, y| x + y);
 }
 
+#[cfg(feature = "cuda")]
 #[test]
 fn cuda_binary_sub_matches_cpu_when_device_available() {
     let lhs: Vec<f32> = (0..64).map(|i| i as f32 * 0.5).collect();
@@ -260,6 +288,7 @@ fn cuda_binary_sub_matches_cpu_when_device_available() {
     run_cuda_binary_case("cuda_binary_sub", BinaryOp::Sub, &lhs, &rhs, |x, y| x - y);
 }
 
+#[cfg(feature = "cuda")]
 #[test]
 fn cuda_binary_mul_matches_cpu_when_device_available() {
     let lhs: Vec<f32> = (0..64).map(|i| i as f32 * 0.5).collect();
@@ -267,6 +296,7 @@ fn cuda_binary_mul_matches_cpu_when_device_available() {
     run_cuda_binary_case("cuda_binary_mul", BinaryOp::Mul, &lhs, &rhs, |x, y| x * y);
 }
 
+#[cfg(feature = "cuda")]
 #[test]
 fn cuda_binary_div_matches_cpu_when_device_available() {
     let lhs: Vec<f32> = (1..65).map(|i| i as f32).collect();
@@ -274,6 +304,7 @@ fn cuda_binary_div_matches_cpu_when_device_available() {
     run_cuda_binary_case("cuda_binary_div", BinaryOp::Div, &lhs, &rhs, |x, y| x / y);
 }
 
+#[cfg(feature = "cuda")]
 #[test]
 fn cuda_unary_not_contiguous_error_when_device_available() {
     let backend = match cuda_backend_or_skip("cuda_unary_not_contiguous_error") {
@@ -286,6 +317,7 @@ fn cuda_unary_not_contiguous_error_when_device_available() {
     assert!(matches!(err, crate::backend::BackendError::NotContiguous));
 }
 
+#[cfg(feature = "cuda")]
 #[test]
 fn cuda_binary_not_contiguous_error_when_device_available() {
     let backend = match cuda_backend_or_skip("cuda_binary_not_contiguous_error") {
@@ -301,6 +333,7 @@ fn cuda_binary_not_contiguous_error_when_device_available() {
     assert!(matches!(err, crate::backend::BackendError::NotContiguous));
 }
 
+#[cfg(feature = "cuda")]
 #[test]
 fn cuda_binary_shape_mismatch_error_when_device_available() {
     let backend = match cuda_backend_or_skip("cuda_binary_shape_mismatch_error") {

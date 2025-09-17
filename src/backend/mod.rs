@@ -31,6 +31,7 @@ pub enum BackendError {
     ShapeMismatch,
     #[error("backend for device {0:?} is not implemented")]
     UnsupportedDevice(Device),
+    #[cfg(feature = "cuda")]
     #[error("cuda runtime error: {0}")]
     Cuda(String),
     #[error("cuda device unavailable: {0}")]
@@ -70,9 +71,11 @@ fn view_from_storage(inner: StorageInner, shape: &[usize]) -> View {
 }
 
 mod cpu;
+#[cfg(feature = "cuda")]
 mod cuda;
 
 pub mod registry;
 
 pub use cpu::CpuBackend;
+#[cfg(feature = "cuda")]
 pub use cuda::CudaBackend;
