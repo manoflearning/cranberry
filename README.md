@@ -15,13 +15,14 @@ A small deep learning framework in Rust and Python
 
 ## Overview
 
-Cranberry is an educational project exploring how a tensor library, automatic differentiation, and a Rust-backed storage layer fit together. The Python front-end intentionally stays simple while the Rust extension supplies fast contiguous kernels and view manipulation utilities. Everything currently targets CPU and 32-bit floating point tensors.
+Cranberry is an educational project exploring how a tensor library, automatic differentiation, and a Rust-backed storage layer fit together. The Python front-end intentionally stays simple while the Rust extension supplies fast contiguous kernels and view manipulation utilities. Everything targets 32-bit floating point tensors and now offers optional CUDA acceleration for pointwise kernels alongside the CPU path.
 
 ## Highlights
 
 - Python-first `Tensor` API backed by the `StorageView` PyO3 module.
 - Reverse-mode autograd with topological traversal, supporting gradient tracking through broadcasting and reshape/expand/permute transforms.
 - Contiguous CPU kernels for unary/binary ops plus sum/max reductions, with broadcasting handled in Python.
+- Optional CUDA backend for contiguous unary and binary operations when an NVIDIA GPU and toolkit are available.
 - Basic neural-network building blocks (`nn.Linear`, `nn.ReLU`, `nn.Sequential`) and stochastic gradient descent in `optim.SGD`.
 - Visualization helpers for autograd graphs (`cranberry.features.visualize`) and an MNIST downloader with caching (`cranberry.features.datasets`).
 
@@ -56,11 +57,12 @@ Cranberry is an educational project exploring how a tensor library, automatic di
 **Rust Extension**
 - `StorageView` exposes contiguous tensor storage, reshaping, expanding, permuting, and random fills.
 - CPU backend implements SIMD-accelerated unary/binary kernels and reduction routines.
+- CUDA backend (via `cudarc`) mirrors the contiguous unary/binary kernels when a CUDA device is detected.
 - Views currently support up to rank-4 tensors; non-contiguous reshape/permute paths are under construction.
 
 ## Limitations & Work in Progress
 
-- CPU-only; GPU/Metal backends are stubbed out.
+- CUDA backend currently covers only contiguous unary/binary kernels; Metal remains stubbed out.
 - Autograd requires scalar losses and does not yet handle slicing/indexing/in-place mutations.
 - Views must be contiguous for most kernels; slicing and advanced indexing are not implemented.
 - Only `float32` tensors are supported; dtype promotion and mixed precision are future work.
@@ -97,6 +99,12 @@ Optional extras:
 - `pip install -e .[viz]` for autograd visualization (requires Graphviz system binary).
 - `pip install -e .[datasets]` for download progress via `tqdm`.
 - `pip install -e .[all]` to include every extra.
+
+## CUDA backend
+
+- Requires an NVIDIA driver and CUDA toolkit (NVRTC must be discoverable via `CUDA_HOME`, `CUDA_PATH`, or the default `/usr/local/cuda`).
+- No separate `nvcc` build step is needed—the crate compiles its kernels at runtime using NVRTC.
+- At runtime pass `device="cuda"` when creating tensors/storage; contiguous unary and binary ops will execute on the GPU and fall back with a runtime error if no device is present.
 
 ## Quickstart
 
