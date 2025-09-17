@@ -161,7 +161,7 @@ impl CudaBackend {
     /// Returns the process-wide CUDA backend instance, creating it on first use.
     pub fn global() -> BackendResult<&'static CudaBackend> {
         CUDA_BACKEND
-            .get_or_init(|| init_backend())
+            .get_or_init(init_backend)
             .as_ref()
             .map_err(Clone::clone)
     }
@@ -234,7 +234,11 @@ impl CudaBackend {
         self.stream.memcpy_stod(slice).map_err(map_driver_err)
     }
 
-    fn from_device_slice(&self, slice: CudaSlice<f32>, shape: &[usize]) -> BackendResult<View> {
+    fn view_from_device_slice(
+        &self,
+        slice: CudaSlice<f32>,
+        shape: &[usize],
+    ) -> BackendResult<View> {
         // The kernel launch is asynchronous with respect to the host.  We force
         // completion here so that when we copy the results back we are guaranteed
         // to see the writes that the GPU just produced.
@@ -309,7 +313,7 @@ impl Backend for CudaBackend {
             UnaryOp::Relu => launch(&self.unary.relu)?,
         }
 
-        self.from_device_slice(device_out, &a.shape)
+        self.view_from_device_slice(device_out, &a.shape)
     }
 
     fn binary(&self, op: BinaryOp, a: &View, b: &View) -> BackendResult<View> {
@@ -362,6 +366,6 @@ impl Backend for CudaBackend {
             BinaryOp::Div => launch(&self.binary.div)?,
         }
 
-        self.from_device_slice(device_out, &a.shape)
+        self.view_from_device_slice(device_out, &a.shape)
     }
 }
