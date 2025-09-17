@@ -26,6 +26,16 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
+    use crate::core::reduce::{ensure_contiguous, normalize_axis, numel, reduce_max, reduce_sum};
+
+    fn reduce_sum_view(view: &View, axis: Option<usize>, keepdim: bool) -> View {
+        reduce_sum(view, axis, keepdim)
+    }
+
+    fn reduce_max_view(view: &View, axis: Option<usize>, keepdim: bool) -> View {
+        reduce_max(view, axis, keepdim)
+    }
+
     fn make_view(shape: &[usize], data: Vec<f32>) -> View {
         let inner = Arc::new(StorageInner::from_vec(data, Device::Cpu));
         View::from_inner_contiguous(inner, shape)
@@ -194,7 +204,7 @@ impl StorageView {
         device: &str,
         seed: Option<u64>,
     ) -> PyResult<Self> {
-        if !(low < high) {
+        if low >= high {
             return Err(pyo3::exceptions::PyValueError::new_err(
                 "uniform requires low < high",
             ));
