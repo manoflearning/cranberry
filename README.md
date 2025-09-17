@@ -15,109 +15,133 @@ A small deep learning framework in Rust and Python
 
 ## Overview
 
-Cranberry is an educational project that provides basic automatic differentiation and tensor operations. The high‑level API is implemented in Python for clarity, and a Rust extension provides vectorized kernels for a low‑level storage API (`StoragePtr`). Currently only CPU is supported.
+Cranberry is an educational project exploring how a tensor library, automatic differentiation, and a Rust-backed storage layer fit together. The Python front-end intentionally stays simple while the Rust extension supplies fast contiguous kernels and view manipulation utilities. Everything currently targets CPU and 32-bit floating point tensors.
 
-## Status (Sep 2025)
+## Highlights
 
-- Tensor and autograd: forward/backward works for common cases; `backward()` is limited to scalars.
-- Ops
-  - Unary: neg, sqrt, relu, exp, log, sigmoid, tanh, gelu
-  - Binary: add, sub, mul, div (with broadcasting)
-  - Reductions: sum, max, mean, softmax, log_softmax
-  - Movement: reshape, expand, permute, flatten, transpose
-  - Linear algebra: matmul (no batched matmul yet)
-- Simple NN modules: `nn.Linear`, `nn.ReLU`, `nn.Sequential`
-- Optimizer: `optim.SGD` (others like Adam are not implemented)
-- Data/visualization: MNIST loader; computation graph visualization utility
-- Rust extension: `StoragePtr` exposed via PyO3; CPU backend implements unary/binary/reduce kernels
+- Python-first `Tensor` API backed by the `StorageView` PyO3 module.
+- Reverse-mode autograd with topological traversal, supporting gradient tracking through broadcasting and reshape/expand/permute transforms.
+- Contiguous CPU kernels for unary/binary ops plus sum/max reductions, with broadcasting handled in Python.
+- Basic neural-network building blocks (`nn.Linear`, `nn.ReLU`, `nn.Sequential`) and stochastic gradient descent in `optim.SGD`.
+- Visualization helpers for autograd graphs (`cranberry.features.visualize`) and an MNIST downloader with caching (`cranberry.features.datasets`).
 
-Limitations
-- GPU/Metal backends are stubs.
-- Tensor slicing/indexing is not implemented.
-- Batched matmul, additional optimizers, and more kernels are in progress.
-- APIs and internals may change.
+## Current Status
+
+**Tensor & Autograd**
+- `Tensor` stores data in a Rust `StorageView` and exposes `.requires_grad`, `.grad`, `.backward()`.
+- `backward()` runs on scalar outputs; higher-rank tensors need manual reduction to a scalar loss.
+- Broadcasting, chaining, and reshape/expand/permute operations participate in autograd; gradients are accumulated in contiguous buffers.
+- Optional NumPy interoperability via `Tensor.numpy()` and `Tensor.grad` when the `numpy` extra is installed.
+
+**Operations**
+- Unary: `neg`, `sqrt`, `relu`, `exp`, `log` plus derived helpers (`sigmoid`, `tanh`, `gelu`).
+- Binary: `add`, `sub`, `mul`, `div` with broadcasting semantics.
+- Reductions: `sum`, `max`, `mean` (derived from `sum`), `softmax`, `log_softmax`.
+- Movement: `reshape`, `expand`, `permute`, `flatten`, `transpose`, `view`.
+- Other helpers: 1D/2D `matmul`, `linear`, and `sparse_categorical_crossentropy`.
+
+**Random & Initialization**
+- Deterministic RNG via `Tensor.manual_seed`.
+- Initializers: `Tensor.randn`, `Tensor.uniform`, `Tensor.kaiming_uniform`.
+
+**Neural Network Utilities**
+- Modules: `nn.Linear`, `nn.ReLU`, `nn.Sequential`.
+- Optimizer: `optim.SGD` with in-place parameter updates and `zero_grad()` convenience.
+
+**Data & Visualization**
+- `features.datasets.fetch` caches downloads under `$XDG_CACHE_HOME` (or `~/Library/Caches` / `~/.cache`) and falls back gracefully when caching is disabled.
+- `features.datasets.mnist()` returns tensors shaped `(N, 1, 28, 28)` for images and `(N,)` for labels.
+- `features.visualize.plot_graph` renders autograd graphs via Graphviz when the `viz` extra is installed.
+
+**Rust Extension**
+- `StorageView` exposes contiguous tensor storage, reshaping, expanding, permuting, and random fills.
+- CPU backend implements SIMD-accelerated unary/binary kernels and reduction routines.
+- Views currently support up to rank-4 tensors; non-contiguous reshape/permute paths are under construction.
+
+## Limitations & Work in Progress
+
+- CPU-only; GPU/Metal backends are stubbed out.
+- Autograd requires scalar losses and does not yet handle slicing/indexing/in-place mutations.
+- Views must be contiguous for most kernels; slicing and advanced indexing are not implemented.
+- Only `float32` tensors are supported; dtype promotion and mixed precision are future work.
+- Batched matrix multiplication, convolutions, and additional operators are not yet implemented.
+- `optim.SGD` is the only optimizer; schedulers, Adam, and other training utilities are on the roadmap.
 
 ## Installation
 
-Requirements: Python 3.11; Rust nightly toolchain for building the native extension.
+Requirements: Python 3.11 and a Rust toolchain (see `rust-toolchain.toml`).
 
-Using uv
+Using uv:
+
 ```bash
 git clone https://github.com/manoflearning/cranberry.git
 cd cranberry
 
-# Set up Python and sync dependencies
 uv python install 3.11
 uv sync --dev
 
-# (Optional) build the native extension
+# Build the native extension in editable mode
 uv run maturin develop
 ```
 
-Using pip (requires Rust toolchain)
+Using pip (requires Rust for the build step):
+
 ```bash
 git clone https://github.com/manoflearning/cranberry.git
 cd cranberry
-pip install -e .
+pip install -e .[numpy]
 ```
 
-Note: Depending on your platform, a local build may be required.
+Optional extras:
 
-Optional features (extras)
-- Core install includes only `numpy`.
-- Visualization utils require `graphviz` and the Graphviz system binary: `uv pip install -e .[viz]`.
-- Dataset download progress uses `tqdm`: `uv pip install -e .[datasets]`.
-- Install everything optional: `uv pip install -e .[all]`.
+- `pip install -e .[viz]` for autograd visualization (requires Graphviz system binary).
+- `pip install -e .[datasets]` for download progress via `tqdm`.
+- `pip install -e .[all]` to include every extra.
 
 ## Quickstart
-
-Minimal example training MNIST with mini‑batches. Tensor slicing is not available yet, so batching uses NumPy views. See `examples/mnist.py` for a complete script.
 
 ```python
 import numpy as np
 from cranberry import nn, optim, Tensor
-from cranberry.features.datasets import mnist
+from cranberry.features import datasets
 
-X_train, Y_train, X_test, Y_test = mnist()
+# Download and reshape MNIST
+X_train, Y_train, X_test, Y_test = datasets.mnist()
 X_train, X_test = X_train.flatten(1), X_test.flatten(1)
 
-X_train_np, Y_train_np = X_train.numpy(), Y_train.numpy()
-X_test_np, Y_test_np = X_test.numpy(), Y_test.numpy()
-
 model = nn.Sequential(
-  nn.Linear(784, 128), nn.ReLU(),
-  nn.Linear(128, 64), nn.ReLU(),
-  nn.Linear(64, 10),
+    nn.Linear(784, 128), nn.ReLU(),
+    nn.Linear(128, 64), nn.ReLU(),
+    nn.Linear(64, 10),
 )
 
-optimizer = optim.SGD(model.parameters(), lr=0.001)
+optimizer = optim.SGD(model.parameters(), lr=1e-3)
 batch_size, epochs = 128, 1
+N = X_train.shape[0]
 
-N = X_train_np.shape[0]
-steps = (N + batch_size - 1) // batch_size
+X_train_np, Y_train_np = X_train.numpy(), Y_train.numpy()
+
 for epoch in range(epochs):
   perm = np.random.permutation(N)
-  for step in range(steps):
-    s, e = step * batch_size, min((step + 1) * batch_size, N)
-    Xb = Tensor(X_train_np[perm[s:e]])
-    Yb = Tensor(Y_train_np[perm[s:e]])
+  for start in range(0, N, batch_size):
+    end = min(start + batch_size, N)
+    inputs = Tensor(X_train_np[perm[start:end]], requires_grad=False)
+    labels = Tensor(Y_train_np[perm[start:end]], requires_grad=False)
 
     optimizer.zero_grad()
-    loss = model(Xb).sparse_categorical_crossentropy(Yb)
+    logits = model(inputs)
+    loss = logits.sparse_categorical_crossentropy(labels)
     loss.backward()
     optimizer.step()
 ```
 
-More examples are available in the [examples](./examples) directory.
+More examples live in `examples/`.
 
-## Roadmap (high level)
+## Development
 
-- Remove NumPy entirely: make Cranberry's `Shape` and `View` abstractions and the Rust `StoragePtr` backend the primary tensor storage; complete end‑to‑end integration across ops, autograd, and NN modules.
-- Slicing/views and batched matmul: first‑class slicing/indexing, views without copies, and batched linear algebra.
-- More optimizers (e.g., Adam) and training utilities.
-- GPU/Metal backends.
-- Packaging, release automation, and documentation.
+- `uv run pytest` runs the Python test suite (requires the Rust extension to be built).
+- `cargo test` exercises the Rust core components.
 
 ## License
 
-MIT License (see `LICENSE`)
+MIT License (see `LICENSE`).
