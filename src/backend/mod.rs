@@ -19,12 +19,16 @@ pub enum BinaryOp {
     Div,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum BackendError {
     #[error("operation requires contiguous views")]
     NotContiguous,
     #[error("shape mismatch")]
     ShapeMismatch,
+    #[error("cuda runtime error: {0}")]
+    Cuda(String),
+    #[error("cuda device unavailable: {0}")]
+    CudaUnavailable(String),
 }
 
 pub type BackendResult<T> = Result<T, BackendError>;
@@ -41,7 +45,10 @@ use std::sync::Arc;
 use crate::core::storage::StorageInner;
 use crate::device::Device;
 
+mod cuda;
 mod kernels_simd;
+
+pub use cuda::CudaBackend;
 
 pub struct CpuBackend;
 

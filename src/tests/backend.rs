@@ -1,12 +1,84 @@
 use std::sync::Arc;
 
-use crate::backend::{Backend, BinaryOp, CpuBackend, UnaryOp};
+use crate::backend::{Backend, BinaryOp, CpuBackend, CudaBackend, UnaryOp};
 use crate::core::{storage::StorageInner, view::View};
 use crate::device::Device;
 
 fn vec_view(v: Vec<f32>) -> View {
     let inner = Arc::new(StorageInner::from_vec(v, Device::Cpu));
     View::from_inner_1d(inner)
+}
+
+fn cuda_view(v: Vec<f32>) -> View {
+    let inner = Arc::new(StorageInner::from_vec(v, Device::Cuda));
+    View::from_inner_1d(inner)
+}
+
+fn cuda_backend_or_skip(test_name: &str) -> Option<&'static CudaBackend> {
+    match CudaBackend::global() {
+        Ok(be) => Some(be),
+        Err(err) => {
+            eprintln!("skipping {test_name}: {err}");
+            None
+        }
+    }
+}
+
+fn assert_close(got: f32, expected: f32, tol: f32, idx: usize) {
+    let diff = (got - expected).abs();
+    assert!(
+        diff <= tol,
+        "value mismatch at index {idx}: got {got}, expected {expected}, diff {diff} > tol {tol}"
+    );
+}
+
+fn assert_vec_close(actual: &[f32], expected: &[f32], tol: f32) {
+    assert_eq!(actual.len(), expected.len(), "length mismatch");
+    for (idx, (got, exp)) in actual.iter().zip(expected.iter()).enumerate() {
+        assert_close(*got, *exp, tol, idx);
+    }
+}
+
+fn run_cuda_unary_case<F>(name: &str, op: UnaryOp, input: &[f32], reference: F)
+where
+    F: Fn(f32) -> f32,
+{
+    let backend = match cuda_backend_or_skip(name) {
+        Some(be) => be,
+        None => return,
+    };
+
+    let view = cuda_view(input.to_vec());
+    let out = backend
+        .unary(op, &view)
+        .unwrap_or_else(|err| panic!("{} failed: {}", name, err));
+    let actual = out.inner.as_slice(out.offset, out.numel());
+    let expected: Vec<f32> = input.iter().copied().map(reference).collect();
+    assert_vec_close(actual, expected.as_slice(), 1e-5);
+}
+
+fn run_cuda_binary_case<F>(name: &str, op: BinaryOp, lhs: &[f32], rhs: &[f32], reference: F)
+where
+    F: Fn(f32, f32) -> f32,
+{
+    let backend = match cuda_backend_or_skip(name) {
+        Some(be) => be,
+        None => return,
+    };
+
+    let a = cuda_view(lhs.to_vec());
+    let b = cuda_view(rhs.to_vec());
+    let out = backend
+        .binary(op, &a, &b)
+        .unwrap_or_else(|err| panic!("{} failed: {}", name, err));
+    let actual = out.inner.as_slice(out.offset, out.numel());
+    let expected: Vec<f32> = lhs
+        .iter()
+        .copied()
+        .zip(rhs.iter().copied())
+        .map(|(x, y)| reference(x, y))
+        .collect();
+    assert_vec_close(actual, expected.as_slice(), 1e-5);
 }
 
 #[test]
@@ -99,4 +171,121 @@ fn binary_not_contiguous_error() {
     let be = CpuBackend;
     let err = be.binary(BinaryOp::Add, &a_nc, &b).unwrap_err();
     assert!(matches!(err, crate::backend::BackendError::NotContiguous));
+}
+
+#[test]
+fn cuda_unary_neg_matches_cpu_when_device_available() {
+    run_cuda_unary_case(
+        "cuda_unary_neg",
+        UnaryOp::Neg,
+        &[1.0, -3.0, 0.5, 7.25],
+        |x| -x,
+    );
+}
+
+#[test]
+fn cuda_unary_sqrt_matches_cpu_when_device_available() {
+    run_cuda_unary_case(
+        "cuda_unary_sqrt",
+        UnaryOp::Sqrt,
+        &[0.0, 0.25, 1.0, 4.0, 9.0],
+        |x| x.sqrt(),
+    );
+}
+
+#[test]
+fn cuda_unary_exp_matches_cpu_when_device_available() {
+    run_cuda_unary_case(
+        "cuda_unary_exp",
+        UnaryOp::Exp,
+        &[1.0, -2.5, 3.25, -4.75, 0.0],
+        |x| x.exp(),
+    );
+}
+
+#[test]
+fn cuda_unary_log_matches_cpu_when_device_available() {
+    run_cuda_unary_case(
+        "cuda_unary_log",
+        UnaryOp::Log,
+        &[0.25, 1.0, 2.5, 10.0],
+        |x| x.ln(),
+    );
+}
+
+#[test]
+fn cuda_unary_relu_matches_cpu_when_device_available() {
+    run_cuda_unary_case(
+        "cuda_unary_relu",
+        UnaryOp::Relu,
+        &[-3.0, -0.5, 0.0, 0.5, 2.0, 5.0],
+        |x| x.max(0.0),
+    );
+}
+
+#[test]
+fn cuda_binary_add_matches_cpu_when_device_available() {
+    let lhs: Vec<f32> = (0..64).map(|i| i as f32 * 0.5).collect();
+    let rhs: Vec<f32> = (0..64).map(|i| i as f32 * -0.25).collect();
+    run_cuda_binary_case("cuda_binary_add", BinaryOp::Add, &lhs, &rhs, |x, y| x + y);
+}
+
+#[test]
+fn cuda_binary_sub_matches_cpu_when_device_available() {
+    let lhs: Vec<f32> = (0..64).map(|i| i as f32 * 0.5).collect();
+    let rhs: Vec<f32> = (0..64).map(|i| i as f32 * -0.25).collect();
+    run_cuda_binary_case("cuda_binary_sub", BinaryOp::Sub, &lhs, &rhs, |x, y| x - y);
+}
+
+#[test]
+fn cuda_binary_mul_matches_cpu_when_device_available() {
+    let lhs: Vec<f32> = (0..64).map(|i| i as f32 * 0.5).collect();
+    let rhs: Vec<f32> = (0..64).map(|i| (i as f32 + 1.0) * 0.1).collect();
+    run_cuda_binary_case("cuda_binary_mul", BinaryOp::Mul, &lhs, &rhs, |x, y| x * y);
+}
+
+#[test]
+fn cuda_binary_div_matches_cpu_when_device_available() {
+    let lhs: Vec<f32> = (1..65).map(|i| i as f32).collect();
+    let rhs: Vec<f32> = (1..65).map(|i| (i as f32) * 0.5 + 1.0).collect();
+    run_cuda_binary_case("cuda_binary_div", BinaryOp::Div, &lhs, &rhs, |x, y| x / y);
+}
+
+#[test]
+fn cuda_unary_not_contiguous_error_when_device_available() {
+    let backend = match cuda_backend_or_skip("cuda_unary_not_contiguous_error") {
+        Some(be) => be,
+        None => return,
+    };
+    let view = cuda_view((0..12).map(|i| i as f32).collect()).reshape_contiguous(&[3, 4]);
+    let non_contig = view.permute(&[1, 0]);
+    let err = backend.unary(UnaryOp::Neg, &non_contig).unwrap_err();
+    assert!(matches!(err, crate::backend::BackendError::NotContiguous));
+}
+
+#[test]
+fn cuda_binary_not_contiguous_error_when_device_available() {
+    let backend = match cuda_backend_or_skip("cuda_binary_not_contiguous_error") {
+        Some(be) => be,
+        None => return,
+    };
+    let view_a = cuda_view((0..12).map(|i| i as f32).collect()).reshape_contiguous(&[3, 4]);
+    let view_b = cuda_view((0..12).rev().map(|i| i as f32).collect()).reshape_contiguous(&[3, 4]);
+    let non_contig = view_a.permute(&[1, 0]);
+    let err = backend
+        .binary(BinaryOp::Add, &non_contig, &view_b)
+        .unwrap_err();
+    assert!(matches!(err, crate::backend::BackendError::NotContiguous));
+}
+
+#[test]
+fn cuda_binary_shape_mismatch_error_when_device_available() {
+    let backend = match cuda_backend_or_skip("cuda_binary_shape_mismatch_error") {
+        Some(be) => be,
+        None => return,
+    };
+    let a = cuda_view(vec![1.0, 2.0, 3.0]);
+    let b = cuda_view(vec![4.0, 5.0]);
+    let err = backend.binary(BinaryOp::Add, &a, &b).unwrap_err();
+    assert!(matches!(err, crate::backend::BackendError::ShapeMismatch));
 }
