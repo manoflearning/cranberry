@@ -2,6 +2,20 @@ use std::sync::Arc;
 
 use super::storage::StorageInner;
 
+pub(crate) fn contiguous_strides(shape: &[usize]) -> Vec<isize> {
+    if shape.is_empty() {
+        return Vec::new();
+    }
+    let mut stride = 1isize;
+    let mut strides = vec![0isize; shape.len()];
+    for (i, dim) in shape.iter().rev().enumerate() {
+        let idx = shape.len() - 1 - i;
+        strides[idx] = stride;
+        stride *= *dim as isize;
+    }
+    strides
+}
+
 #[derive(Clone, Debug)]
 pub struct View {
     pub(crate) inner: Arc<StorageInner>,
@@ -18,6 +32,25 @@ impl View {
             offset: 0,
             shape: vec![len],
             strides: vec![1],
+        }
+    }
+
+    pub fn from_inner_contiguous(inner: Arc<StorageInner>, shape: &[usize]) -> Self {
+        let expected = if shape.is_empty() {
+            1
+        } else {
+            shape.iter().product()
+        };
+        debug_assert_eq!(
+            inner.len(),
+            expected,
+            "inner length must match shape product"
+        );
+        Self {
+            inner,
+            offset: 0,
+            shape: shape.to_vec(),
+            strides: contiguous_strides(shape),
         }
     }
 
@@ -57,18 +90,11 @@ impl View {
             new_shape.iter().copied().product::<usize>(),
             "reshape size mismatch"
         );
-        let mut stride = 1isize;
-        let mut strides = vec![0isize; new_shape.len()];
-        for (i, dim) in new_shape.iter().rev().enumerate() {
-            let idx = new_shape.len() - 1 - i;
-            strides[idx] = stride;
-            stride *= *dim as isize;
-        }
         Self {
             inner: self.inner.clone(),
             offset: self.offset,
             shape: new_shape.to_vec(),
-            strides,
+            strides: contiguous_strides(new_shape),
         }
     }
 
@@ -120,4 +146,36 @@ impl View {
     }
 
     // TODO: general strided iteration, overlap/alias checks.
+
+    pub fn to_contiguous(&self) -> Self {
+        if self.is_contiguous() {
+            return self.clone();
+        }
+        let numel = self.numel();
+        let mut out_inner = StorageInner::new_full(0.0, numel, self.inner.device());
+        {
+            let out_slice = out_inner.as_mut_slice(0, numel);
+            for (i, slot) in out_slice.iter_mut().enumerate() {
+                let mut linear = self.offset as isize;
+                if !self.shape.is_empty() {
+                    let mut idx = i;
+                    for axis in (0..self.shape.len()).rev() {
+                        let dim = self.shape[axis];
+                        let stride = self.strides[axis];
+                        let coord = idx % dim;
+                        idx /= dim;
+                        linear += coord as isize * stride;
+                    }
+                }
+                let linear = linear as usize;
+                *slot = self.inner.as_slice(linear, 1)[0];
+            }
+        }
+        Self {
+            inner: Arc::new(out_inner),
+            offset: 0,
+            shape: self.shape.clone(),
+            strides: contiguous_strides(&self.shape),
+        }
+    }
 }
