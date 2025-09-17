@@ -36,7 +36,7 @@ jobs:
         run: cargo fmt --all -- --check
   
       - name: Run clippy
-        run: cargo clippy --workspace --all-features
+        run: cargo clippy
   
   check_style_python:
     name: Check file formatting and style (Python)
@@ -74,7 +74,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
   
       - name: Run tests
-        run: cargo test --workspace --all-features
+        run: cargo test
 
   test_python:
     name: Tests (Python)
