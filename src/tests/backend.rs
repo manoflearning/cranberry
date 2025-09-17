@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::backend::{Backend, BinaryOp, CpuBackend, CudaBackend, UnaryOp};
+use crate::backend::{registry, Backend, BackendError, BinaryOp, CudaBackend, UnaryOp};
 use crate::core::{storage::StorageInner, view::View};
 use crate::device::Device;
 
@@ -15,7 +15,7 @@ fn cuda_view(v: Vec<f32>) -> View {
 }
 
 fn cuda_backend_or_skip(test_name: &str) -> Option<&'static CudaBackend> {
-    match CudaBackend::global() {
+    match registry::cuda() {
         Ok(be) => Some(be),
         Err(err) => {
             eprintln!("skipping {test_name}: {err}");
@@ -84,7 +84,7 @@ where
 #[test]
 fn unary_neg_matches_scalar() {
     let a = vec_view(vec![1.0, -2.0, 3.0, -4.5, 0.25]);
-    let be = CpuBackend;
+    let be = registry::cpu();
     let out = be.unary(UnaryOp::Neg, &a).unwrap();
     let actual = out.inner.as_slice(out.offset, out.numel());
     let expect: Vec<f32> = a
@@ -99,7 +99,7 @@ fn unary_neg_matches_scalar() {
 #[test]
 fn unary_sqrt_matches_scalar() {
     let a = vec_view(vec![0.0, 0.25, 1.0, 4.0, 9.0, 16.0, 2.25]);
-    let be = CpuBackend;
+    let be = registry::cpu();
     let out = be.unary(UnaryOp::Sqrt, &a).unwrap();
     let actual = out.inner.as_slice(out.offset, out.numel());
     let expect: Vec<f32> = a
@@ -116,7 +116,7 @@ fn unary_sqrt_matches_scalar() {
 #[test]
 fn unary_relu_matches_scalar() {
     let a = vec_view(vec![-3.0, -0.5, 0.0, 0.5, 2.0, 5.0]);
-    let be = CpuBackend;
+    let be = registry::cpu();
     let out = be.unary(UnaryOp::Relu, &a).unwrap();
     let actual = out.inner.as_slice(out.offset, out.numel());
     let expect: Vec<f32> = a
@@ -134,7 +134,7 @@ fn unary_relu_matches_scalar() {
 fn binary_add_matches_scalar() {
     let a = vec_view((0..130).map(|i| i as f32 * 0.5).collect()); // span SIMD + remainder
     let b = vec_view((0..130).map(|i| i as f32 * -0.25).collect());
-    let be = CpuBackend;
+    let be = registry::cpu();
     let out = be.binary(BinaryOp::Add, &a, &b).unwrap();
     let actual = out.inner.as_slice(out.offset, out.numel());
     let a_s = a.inner.as_slice(a.offset, a.numel());
@@ -148,7 +148,7 @@ fn binary_add_matches_scalar() {
 fn binary_shape_mismatch_error() {
     let a = vec_view(vec![1.0, 2.0, 3.0]);
     let b = vec_view(vec![4.0, 5.0]);
-    let be = CpuBackend;
+    let be = registry::cpu();
     let err = be.binary(BinaryOp::Add, &a, &b).unwrap_err();
     assert!(matches!(err, crate::backend::BackendError::ShapeMismatch));
 }
@@ -158,7 +158,7 @@ fn unary_not_contiguous_error() {
     let a = vec_view((0..12).map(|i| i as f32).collect()).reshape_contiguous(&[3, 4]);
     let a_nc = a.permute(&[1, 0]);
     assert!(!a_nc.is_contiguous());
-    let be = CpuBackend;
+    let be = registry::cpu();
     let err = be.unary(UnaryOp::Neg, &a_nc).unwrap_err();
     assert!(matches!(err, crate::backend::BackendError::NotContiguous));
 }
@@ -168,9 +168,32 @@ fn binary_not_contiguous_error() {
     let a = vec_view((0..12).map(|i| i as f32).collect()).reshape_contiguous(&[3, 4]);
     let b = vec_view((0..12).rev().map(|i| i as f32).collect()).reshape_contiguous(&[3, 4]);
     let a_nc = a.permute(&[1, 0]);
-    let be = CpuBackend;
+    let be = registry::cpu();
     let err = be.binary(BinaryOp::Add, &a_nc, &b).unwrap_err();
     assert!(matches!(err, crate::backend::BackendError::NotContiguous));
+}
+
+#[test]
+fn registry_get_cpu_backend() {
+    let backend = registry::get(Device::Cpu).unwrap();
+    let view = vec_view(vec![1.0, -2.0, 3.0]);
+    let out = backend.unary(UnaryOp::Neg, &view).unwrap();
+    assert_eq!(
+        out.inner.as_slice(out.offset, out.numel()),
+        &[-1.0, 2.0, -3.0]
+    );
+}
+
+#[test]
+fn registry_reports_unsupported_device() {
+    let err = match registry::get(Device::Metal) {
+        Ok(_) => panic!("expected registry lookup to fail for Metal"),
+        Err(err) => err,
+    };
+    assert!(matches!(
+        err,
+        BackendError::UnsupportedDevice(Device::Metal)
+    ));
 }
 
 #[test]

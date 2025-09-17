@@ -1,6 +1,10 @@
 use thiserror::Error;
 
+use std::sync::Arc;
+
+use crate::core::storage::StorageInner;
 use crate::core::view::{contiguous_strides, View};
+use crate::device::Device;
 
 #[derive(Debug, Clone, Copy)]
 pub enum UnaryOp {
@@ -25,6 +29,8 @@ pub enum BackendError {
     NotContiguous,
     #[error("shape mismatch")]
     ShapeMismatch,
+    #[error("backend for device {0:?} is not implemented")]
+    UnsupportedDevice(Device),
     #[error("cuda runtime error: {0}")]
     Cuda(String),
     #[error("cuda device unavailable: {0}")]
@@ -38,69 +44,35 @@ pub trait Backend {
     fn binary(&self, op: BinaryOp, a: &View, b: &View) -> BackendResult<View>;
 }
 
-// === CPU backend (contiguous-only for now) ===
-
-use std::sync::Arc;
-
-use crate::core::storage::StorageInner;
-use crate::device::Device;
-
-mod cuda;
-mod kernels_simd;
-
-pub use cuda::CudaBackend;
-
-pub struct CpuBackend;
-
-impl Backend for CpuBackend {
-    fn unary(&self, op: UnaryOp, a: &View) -> BackendResult<View> {
-        if !a.is_contiguous() {
-            return Err(BackendError::NotContiguous);
-        }
-        let a_slice = a.inner.as_slice(a.offset, a.numel());
-        let mut out_inner = StorageInner::new_full(0.0, a.numel(), Device::Cpu);
-        {
-            let out_slice = out_inner.as_mut_slice(0, a.numel());
-            match op {
-                UnaryOp::Neg => kernels_simd::unary_ops::neg(a_slice, out_slice),
-                UnaryOp::Sqrt => kernels_simd::unary_ops::sqrt(a_slice, out_slice),
-                UnaryOp::Exp => kernels_simd::unary_ops::exp(a_slice, out_slice),
-                UnaryOp::Log => kernels_simd::unary_ops::log(a_slice, out_slice),
-                UnaryOp::Relu => kernels_simd::unary_ops::relu(a_slice, out_slice),
-            }
-        }
-        Ok(View {
-            inner: Arc::new(out_inner),
-            offset: 0,
-            shape: a.shape.clone(),
-            strides: contiguous_strides(&a.shape),
-        })
-    }
-
-    fn binary(&self, op: BinaryOp, a: &View, b: &View) -> BackendResult<View> {
-        if !a.is_contiguous() || !b.is_contiguous() {
-            return Err(BackendError::NotContiguous);
-        }
-        if a.numel() != b.numel() {
-            return Err(BackendError::ShapeMismatch);
-        }
-        let a_slice = a.inner.as_slice(a.offset, a.numel());
-        let b_slice = b.inner.as_slice(b.offset, b.numel());
-        let mut out_inner = StorageInner::new_full(0.0, a.numel(), Device::Cpu);
-        {
-            let out_slice = out_inner.as_mut_slice(0, a.numel());
-            match op {
-                BinaryOp::Add => kernels_simd::binary_ops::add(a_slice, b_slice, out_slice),
-                BinaryOp::Sub => kernels_simd::binary_ops::sub(a_slice, b_slice, out_slice),
-                BinaryOp::Mul => kernels_simd::binary_ops::mul(a_slice, b_slice, out_slice),
-                BinaryOp::Div => kernels_simd::binary_ops::div(a_slice, b_slice, out_slice),
-            }
-        }
-        Ok(View {
-            inner: Arc::new(out_inner),
-            offset: 0,
-            shape: a.shape.clone(),
-            strides: contiguous_strides(&a.shape),
-        })
+fn require_contiguous(view: &View) -> BackendResult<()> {
+    if view.is_contiguous() {
+        Ok(())
+    } else {
+        Err(BackendError::NotContiguous)
     }
 }
+
+fn require_same_numel(a: &View, b: &View) -> BackendResult<()> {
+    if a.numel() == b.numel() {
+        Ok(())
+    } else {
+        Err(BackendError::ShapeMismatch)
+    }
+}
+
+fn view_from_storage(inner: StorageInner, shape: &[usize]) -> View {
+    View {
+        inner: Arc::new(inner),
+        offset: 0,
+        shape: shape.to_vec(),
+        strides: contiguous_strides(shape),
+    }
+}
+
+mod cpu;
+mod cuda;
+
+pub mod registry;
+
+pub use cpu::CpuBackend;
+pub use cuda::CudaBackend;

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use pyo3::prelude::*;
 
-use crate::backend::{Backend, BackendError, BinaryOp, CpuBackend, CudaBackend, UnaryOp};
+use crate::backend::{registry, Backend, BackendError, BinaryOp, UnaryOp};
 use crate::core::{
     reduce::{self, AxisError},
     storage::StorageInner,
@@ -25,8 +25,16 @@ fn backend_err_to_py(err: BackendError) -> PyErr {
     pyo3::exceptions::PyRuntimeError::new_err(err.to_string())
 }
 
-fn cuda_backend_or_pyerr() -> Result<&'static CudaBackend, PyErr> {
-    CudaBackend::global().map_err(backend_err_to_py)
+fn backend_for_device(device: Device) -> Result<&'static dyn Backend, PyErr> {
+    match registry::get(device) {
+        Ok(backend) => Ok(backend),
+        Err(BackendError::UnsupportedDevice(device)) => {
+            Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                BackendError::UnsupportedDevice(device).to_string(),
+            ))
+        }
+        Err(err) => Err(backend_err_to_py(err)),
+    }
 }
 
 #[cfg(test)]
@@ -286,206 +294,80 @@ impl StorageView {
     }
 
     pub fn neg(&self) -> PyResult<StorageView> {
-        match self.view.inner.device() {
-            crate::device::Device::Cpu => {
-                let backend = CpuBackend;
-                let out = backend
-                    .unary(UnaryOp::Neg, &self.view)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-                Ok(StorageView { view: out })
-            }
-            crate::device::Device::Cuda => {
-                let backend = cuda_backend_or_pyerr()?;
-                let out = backend
-                    .unary(UnaryOp::Neg, &self.view)
-                    .map_err(backend_err_to_py)?;
-                Ok(StorageView { view: out })
-            }
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "unary ops not implemented for this device",
-            )),
-        }
+        let backend = backend_for_device(self.view.inner.device())?;
+        let out = backend
+            .unary(UnaryOp::Neg, &self.view)
+            .map_err(backend_err_to_py)?;
+        Ok(StorageView { view: out })
     }
     pub fn sqrt(&self) -> PyResult<StorageView> {
-        match self.view.inner.device() {
-            crate::device::Device::Cpu => {
-                let backend = CpuBackend;
-                let out = backend
-                    .unary(UnaryOp::Sqrt, &self.view)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-                Ok(StorageView { view: out })
-            }
-            crate::device::Device::Cuda => {
-                let backend = cuda_backend_or_pyerr()?;
-                let out = backend
-                    .unary(UnaryOp::Sqrt, &self.view)
-                    .map_err(backend_err_to_py)?;
-                Ok(StorageView { view: out })
-            }
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "unary ops not implemented for this device",
-            )),
-        }
+        let backend = backend_for_device(self.view.inner.device())?;
+        let out = backend
+            .unary(UnaryOp::Sqrt, &self.view)
+            .map_err(backend_err_to_py)?;
+        Ok(StorageView { view: out })
     }
     pub fn relu(&self) -> PyResult<StorageView> {
-        match self.view.inner.device() {
-            crate::device::Device::Cpu => {
-                let backend = CpuBackend;
-                let out = backend
-                    .unary(UnaryOp::Relu, &self.view)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-                Ok(StorageView { view: out })
-            }
-            crate::device::Device::Cuda => {
-                let backend = cuda_backend_or_pyerr()?;
-                let out = backend
-                    .unary(UnaryOp::Relu, &self.view)
-                    .map_err(backend_err_to_py)?;
-                Ok(StorageView { view: out })
-            }
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "unary ops not implemented for this device",
-            )),
-        }
+        let backend = backend_for_device(self.view.inner.device())?;
+        let out = backend
+            .unary(UnaryOp::Relu, &self.view)
+            .map_err(backend_err_to_py)?;
+        Ok(StorageView { view: out })
     }
     pub fn exp(&self) -> PyResult<StorageView> {
-        match self.view.inner.device() {
-            crate::device::Device::Cpu => {
-                let backend = CpuBackend;
-                let out = backend
-                    .unary(UnaryOp::Exp, &self.view)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-                Ok(StorageView { view: out })
-            }
-            crate::device::Device::Cuda => {
-                let backend = cuda_backend_or_pyerr()?;
-                let out = backend
-                    .unary(UnaryOp::Exp, &self.view)
-                    .map_err(backend_err_to_py)?;
-                Ok(StorageView { view: out })
-            }
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "unary ops not implemented for this device",
-            )),
-        }
+        let backend = backend_for_device(self.view.inner.device())?;
+        let out = backend
+            .unary(UnaryOp::Exp, &self.view)
+            .map_err(backend_err_to_py)?;
+        Ok(StorageView { view: out })
     }
     pub fn log(&self) -> PyResult<StorageView> {
-        match self.view.inner.device() {
-            crate::device::Device::Cpu => {
-                let backend = CpuBackend;
-                let out = backend
-                    .unary(UnaryOp::Log, &self.view)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-                Ok(StorageView { view: out })
-            }
-            crate::device::Device::Cuda => {
-                let backend = cuda_backend_or_pyerr()?;
-                let out = backend
-                    .unary(UnaryOp::Log, &self.view)
-                    .map_err(backend_err_to_py)?;
-                Ok(StorageView { view: out })
-            }
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "unary ops not implemented for this device",
-            )),
-        }
+        let backend = backend_for_device(self.view.inner.device())?;
+        let out = backend
+            .unary(UnaryOp::Log, &self.view)
+            .map_err(backend_err_to_py)?;
+        Ok(StorageView { view: out })
     }
 
     pub fn add(&self, other: &StorageView) -> PyResult<StorageView> {
         if self.view.inner.device() != other.view.inner.device() {
             return Err(pyo3::exceptions::PyValueError::new_err("device mismatch"));
         }
-        match self.view.inner.device() {
-            crate::device::Device::Cpu => {
-                let backend = CpuBackend;
-                let out = backend
-                    .binary(BinaryOp::Add, &self.view, &other.view)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-                Ok(StorageView { view: out })
-            }
-            crate::device::Device::Cuda => {
-                let backend = cuda_backend_or_pyerr()?;
-                let out = backend
-                    .binary(BinaryOp::Add, &self.view, &other.view)
-                    .map_err(backend_err_to_py)?;
-                Ok(StorageView { view: out })
-            }
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "binary ops not implemented for this device",
-            )),
-        }
+        let backend = backend_for_device(self.view.inner.device())?;
+        let out = backend
+            .binary(BinaryOp::Add, &self.view, &other.view)
+            .map_err(backend_err_to_py)?;
+        Ok(StorageView { view: out })
     }
     pub fn sub(&self, other: &StorageView) -> PyResult<StorageView> {
         if self.view.inner.device() != other.view.inner.device() {
             return Err(pyo3::exceptions::PyValueError::new_err("device mismatch"));
         }
-        match self.view.inner.device() {
-            crate::device::Device::Cpu => {
-                let backend = CpuBackend;
-                let out = backend
-                    .binary(BinaryOp::Sub, &self.view, &other.view)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-                Ok(StorageView { view: out })
-            }
-            crate::device::Device::Cuda => {
-                let backend = cuda_backend_or_pyerr()?;
-                let out = backend
-                    .binary(BinaryOp::Sub, &self.view, &other.view)
-                    .map_err(backend_err_to_py)?;
-                Ok(StorageView { view: out })
-            }
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "binary ops not implemented for this device",
-            )),
-        }
+        let backend = backend_for_device(self.view.inner.device())?;
+        let out = backend
+            .binary(BinaryOp::Sub, &self.view, &other.view)
+            .map_err(backend_err_to_py)?;
+        Ok(StorageView { view: out })
     }
     pub fn mul(&self, other: &StorageView) -> PyResult<StorageView> {
         if self.view.inner.device() != other.view.inner.device() {
             return Err(pyo3::exceptions::PyValueError::new_err("device mismatch"));
         }
-        match self.view.inner.device() {
-            crate::device::Device::Cpu => {
-                let backend = CpuBackend;
-                let out = backend
-                    .binary(BinaryOp::Mul, &self.view, &other.view)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-                Ok(StorageView { view: out })
-            }
-            crate::device::Device::Cuda => {
-                let backend = cuda_backend_or_pyerr()?;
-                let out = backend
-                    .binary(BinaryOp::Mul, &self.view, &other.view)
-                    .map_err(backend_err_to_py)?;
-                Ok(StorageView { view: out })
-            }
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "binary ops not implemented for this device",
-            )),
-        }
+        let backend = backend_for_device(self.view.inner.device())?;
+        let out = backend
+            .binary(BinaryOp::Mul, &self.view, &other.view)
+            .map_err(backend_err_to_py)?;
+        Ok(StorageView { view: out })
     }
     pub fn div(&self, other: &StorageView) -> PyResult<StorageView> {
         if self.view.inner.device() != other.view.inner.device() {
             return Err(pyo3::exceptions::PyValueError::new_err("device mismatch"));
         }
-        match self.view.inner.device() {
-            crate::device::Device::Cpu => {
-                let backend = CpuBackend;
-                let out = backend
-                    .binary(BinaryOp::Div, &self.view, &other.view)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-                Ok(StorageView { view: out })
-            }
-            crate::device::Device::Cuda => {
-                let backend = cuda_backend_or_pyerr()?;
-                let out = backend
-                    .binary(BinaryOp::Div, &self.view, &other.view)
-                    .map_err(backend_err_to_py)?;
-                Ok(StorageView { view: out })
-            }
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "binary ops not implemented for this device",
-            )),
-        }
+        let backend = backend_for_device(self.view.inner.device())?;
+        let out = backend
+            .binary(BinaryOp::Div, &self.view, &other.view)
+            .map_err(backend_err_to_py)?;
+        Ok(StorageView { view: out })
     }
 
     #[pyo3(signature = (dim=None, keepdim=false))]
@@ -497,8 +379,8 @@ impl StorageView {
                 let reduced = reduce::reduce_sum(&self.view, axis, keepdim);
                 Ok(StorageView { view: reduced })
             }
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "sum not implemented for this device",
+            other => Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                BackendError::UnsupportedDevice(other).to_string(),
             )),
         }
     }
@@ -512,8 +394,8 @@ impl StorageView {
                 let reduced = reduce::reduce_max(&self.view, axis, keepdim);
                 Ok(StorageView { view: reduced })
             }
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "max not implemented for this device",
+            other => Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                BackendError::UnsupportedDevice(other).to_string(),
             )),
         }
     }
