@@ -101,17 +101,18 @@ wheels = [
 name = "cranberry"
 version = "0.1.3"
 source = { editable = "." }
-dependencies = [
-    { name = "numpy" },
-]
 
 [package.optional-dependencies]
 all = [
     { name = "graphviz" },
+    { name = "numpy" },
     { name = "tqdm" },
 ]
 datasets = [
     { name = "tqdm" },
+]
+numpy = [
+    { name = "numpy" },
 ]
 viz = [
     { name = "graphviz" },
@@ -121,6 +122,7 @@ viz = [
 dev = [
     { name = "matplotlib" },
     { name = "maturin" },
+    { name = "numpy" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "ruff" },
@@ -132,17 +134,19 @@ dev = [
 requires-dist = [
     { name = "graphviz", marker = "extra == 'all'", specifier = ">=0.20.3,<0.21" },
     { name = "graphviz", marker = "extra == 'viz'", specifier = ">=0.20.3,<0.21" },
-    { name = "numpy", specifier = "~=2.0" },
+    { name = "numpy", marker = "extra == 'all'", specifier = ">=2.0" },
+    { name = "numpy", marker = "extra == 'numpy'", specifier = ">=2.0" },
     { name = "tqdm", marker = "extra == 'all'", specifier = ">=4.66.4,<5" },
     { name = "tqdm", marker = "extra == 'datasets'", specifier = ">=4.66.4,<5" },
 ]
-provides-extras = ["viz", "datasets", "all"]
+provides-extras = ["viz", "datasets", "numpy", "all"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "matplotlib", specifier = ">=3.10.6" },
     { name = "maturin", specifier = ">=1.7.1,<2" },
-    { name = "pyright", specifier = ">=1.1.372,<2" },
+    { name = "numpy", specifier = ">=2.0" },
+    { name = "pyright", specifier = ">=1.1.405,<2" },
     { name = "pytest", specifier = ">=8.3.1,<9" },
     { name = "ruff", specifier = ">=0.5.4,<0.6" },
     { name = "scikit-learn", specifier = ">=1.7.2" },
@@ -784,15 +788,15 @@ wheels = [
 
 [[package]]
 name = "pyright"
-version = "1.1.389"
+version = "1.1.405"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "nodeenv" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/72/4e/9a5ab8745e7606b88c2c7ca223449ac9d82a71fd5e31df47b453f2cb39a1/pyright-1.1.389.tar.gz", hash = "sha256:716bf8cc174ab8b4dcf6828c3298cac05c5ed775dda9910106a5dcfe4c7fe220", size = 21940, upload-time = "2024-11-13T16:35:41.84Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fb/6c/ba4bbee22e76af700ea593a1d8701e3225080956753bee9750dcc25e2649/pyright-1.1.405.tar.gz", hash = "sha256:5c2a30e1037af27eb463a1cc0b9f6d65fec48478ccf092c1ac28385a15c55763", size = 4068319, upload-time = "2025-09-04T03:37:06.776Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1b/26/c288cabf8cfc5a27e1aa9e5029b7682c0f920b8074f45d22bf844314d66a/pyright-1.1.389-py3-none-any.whl", hash = "sha256:41e9620bba9254406dc1f621a88ceab5a88af4c826feb4f614d95691ed243a60", size = 18581, upload-time = "2024-11-13T16:35:40.689Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/1a/524f832e1ff1962a22a1accc775ca7b143ba2e9f5924bb6749dce566784a/pyright-1.1.405-py3-none-any.whl", hash = "sha256:a2cb13700b5508ce8e5d4546034cb7ea4aedb60215c6c33f56cec7f53996035a", size = 5905038, upload-time = "2025-09-04T03:37:04.913Z" },
 ]
 
 [[package]]
