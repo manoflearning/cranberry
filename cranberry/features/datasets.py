@@ -17,11 +17,14 @@ OSX = sys.platform == "darwin"
 # Optional tqdm progress bar
 try:
   from tqdm import tqdm as _tqdm  # type: ignore
+
   tqdm = _tqdm  # noqa: N802 - keep name compatibility
 except Exception:  # pragma: no cover - fallback path
+
   class _NoopTqdm:
     def __init__(self, *a, **kw):
       pass
+
     def update(self, n: int):
       pass
 

@@ -55,7 +55,9 @@ jobs:
         run: uv sync --locked --dev
 
       - name: Ruff
-        run: uv run ruff check .
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
 
       - name: Pyright
         run: uv run pyright

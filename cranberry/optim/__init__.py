@@ -1,4 +1,4 @@
-from cranberry import Tensor
+from cranberry import StorageView, Tensor
 from typing import List
 
 
@@ -11,16 +11,29 @@ class SGD:
     self._params, self._lr = params, lr
 
   def zero_grad(self):
-    for p in self._params: p._grad.fill(0.0)
+    for p in self._params:
+      p.zero_grad()
 
   def step(self):
-    for p in self._params: p._data -= self._lr * p._grad
+    for p in self._params:
+      grad_storage = p.grad_storage()
+      if grad_storage is None:
+        continue
+      grad_view = grad_storage.contiguous()
+      shape_list = list(p.shape)
+      scale = StorageView.full(float(self._lr), max(p.num_elements(), 1), p.device)
+      scale = scale.reshape(shape_list) if shape_list else scale.reshape([])
+      scaled_grad = grad_view.mul(scale)
+      new_data = p.data_storage().contiguous().sub(scaled_grad)
+      p.set_data_storage(new_data)
 
   @property
-  def lr(self): return self._lr
+  def lr(self):
+    return self._lr
 
   @lr.setter
-  def lr(self, lr: float): self._lr = lr
+  def lr(self, lr: float):
+    self._lr = lr
 
 
 # https://pytorch.org/docs/stable/generated/torch.optim.Adam.html

@@ -7,16 +7,20 @@ from typing import List
 
 class Module:
   @abstractmethod
-  def __call__(self, x: Tensor) -> Tensor: pass
+  def __call__(self, x: Tensor) -> Tensor:
+    pass
 
   @abstractmethod
-  def parameters(self) -> List[Tensor]: pass
+  def parameters(self) -> List[Tensor]:
+    pass
 
 
 class ReLU(Module):
-  def __call__(self, x: Tensor) -> Tensor: return x.relu()
+  def __call__(self, x: Tensor) -> Tensor:
+    return x.relu()
 
-  def parameters(self) -> List[Tensor]: return []
+  def parameters(self) -> List[Tensor]:
+    return []
 
 
 class Linear(Module):
@@ -38,7 +42,8 @@ class Sequential(Module):
     self.layers = layers
 
   def __call__(self, x: Tensor) -> Tensor:
-    for layer in self.layers: x = layer(x)
+    for layer in self.layers:
+      x = layer(x)
     return x
 
   def parameters(self) -> List[Tensor]:
