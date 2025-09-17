@@ -7,7 +7,7 @@ class UnaryOps(Enum):
   SQRT = auto()
   RELU = auto()
   EXP = auto()
-  LOG = auto()  # noqa: E702
+  LOG = auto()
 
   def __repr__(self):
     return f"{self.name.lower()}"
@@ -17,7 +17,7 @@ class BinaryOps(Enum):
   ADD = auto()
   SUB = auto()
   MUL = auto()
-  DIV = auto()  # noqa: E702
+  DIV = auto()
 
   def __repr__(self):
     return f"{self.name.lower()}"
@@ -25,7 +25,7 @@ class BinaryOps(Enum):
 
 class ReduceOps(Enum):
   SUM = auto()
-  MAX = auto()  # noqa: E702
+  MAX = auto()
 
   def __repr__(self):
     return f"{self.name.lower()}"
@@ -34,7 +34,7 @@ class ReduceOps(Enum):
 class MovementOps(Enum):
   RESHAPE = auto()
   EXPAND = auto()
-  PERMUTE = auto()  # noqa: E702
+  PERMUTE = auto()
 
   def __repr__(self):
     return f"{self.name.lower()}"
