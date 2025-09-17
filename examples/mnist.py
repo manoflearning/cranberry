@@ -12,8 +12,10 @@ X_train_np, Y_train_np = X_train.numpy(), Y_train.numpy()
 X_test_np, Y_test_np = X_test.numpy(), Y_test.numpy()
 
 model = nn.Sequential(
-  nn.Linear(784, 128), nn.ReLU(),
-  nn.Linear(128, 64), nn.ReLU(),
+  nn.Linear(784, 128),
+  nn.ReLU(),
+  nn.Linear(128, 64),
+  nn.ReLU(),
   nn.Linear(64, 10),
 )
 
@@ -43,7 +45,8 @@ for epoch in range(epochs):
     running_loss += loss.item()
     if (step + 1) % 50 == 0 or step + 1 == steps_per_epoch:
       avg = running_loss / (step + 1)
-      print(f"epoch {epoch+1}/{epochs} step {step+1}/{steps_per_epoch} - loss {avg:.4f}")
+      print(f"epoch {epoch + 1}/{epochs} step {step + 1}/{steps_per_epoch} - loss {avg:.4f}")
+
 
 # Simple test accuracy
 def accuracy(X_np: np.ndarray, Y_np: np.ndarray) -> float:
@@ -56,5 +59,6 @@ def accuracy(X_np: np.ndarray, Y_np: np.ndarray) -> float:
     total += e - s
   return correct / total
 
+
 test_acc = accuracy(X_test_np, Y_test_np)
-print(f"test accuracy: {test_acc*100:.2f}%")
+print(f"test accuracy: {test_acc * 100:.2f}%")

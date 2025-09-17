@@ -10,9 +10,12 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 pyo3 = { version = "0.24.1", features = ["extension-module"] }
 rand = { version = "0.8.5" }
+rand_distr = "0.4"
 thiserror = "1"
 
 [features]
+default = ["python"]
+python = []
 abi3 = ["pyo3/abi3-py37", "generate-import-lib"]
 generate-import-lib = ["pyo3/generate-import-lib"]
 

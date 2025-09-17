@@ -8,8 +8,24 @@ from typing import Optional, Union
 import urllib.request
 import sys
 
-import numpy as np
+from typing import TYPE_CHECKING, Any
+
 from cranberry import Tensor
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+  pass
+
+try:  # pragma: no cover - optional dependency
+  import numpy as np  # type: ignore[assignment]
+except ImportError:  # pragma: no cover
+  np = None  # type: ignore[assignment]
+
+
+def _require_numpy() -> Any:
+  if np is None:  # pragma: no cover - optional path
+    raise RuntimeError("NumPy is required for dataset utilities. Install 'cranberry[numpy]' to enable them.")
+  return np
+
 
 # Platform detection without psutil
 OSX = sys.platform == "darwin"
@@ -17,11 +33,14 @@ OSX = sys.platform == "darwin"
 # Optional tqdm progress bar
 try:
   from tqdm import tqdm as _tqdm  # type: ignore
+
   tqdm = _tqdm  # noqa: N802 - keep name compatibility
 except Exception:  # pragma: no cover - fallback path
+
   class _NoopTqdm:
     def __init__(self, *a, **kw):
       pass
+
     def update(self, n: int):
       pass
 
@@ -60,10 +79,11 @@ def fetch(
 
 
 def _fetch_mnist(file, offset):
+  np_mod = _require_numpy()
   return Tensor(
-    np.frombuffer(
+    np_mod.frombuffer(
       gzip.open(fetch("https://storage.googleapis.com/cvdf-datasets/mnist/" + file)).read()[offset:],
-      dtype=np.uint8,
+      dtype=np_mod.uint8,
     )
   )
 

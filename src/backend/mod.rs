@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::core::view::View;
+use crate::core::view::{contiguous_strides, View};
 
 #[derive(Debug, Clone, Copy)]
 pub enum UnaryOp {
@@ -8,6 +8,7 @@ pub enum UnaryOp {
     Sqrt,
     Exp,
     Log,
+    Relu,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -58,20 +59,14 @@ impl Backend for CpuBackend {
                 UnaryOp::Sqrt => kernels_simd::unary_ops::sqrt(a_slice, out_slice),
                 UnaryOp::Exp => kernels_simd::unary_ops::exp(a_slice, out_slice),
                 UnaryOp::Log => kernels_simd::unary_ops::log(a_slice, out_slice),
+                UnaryOp::Relu => kernels_simd::unary_ops::relu(a_slice, out_slice),
             }
-        }
-        let mut stride = 1isize;
-        let mut strides = vec![0isize; a.shape.len()];
-        for (i, dim) in a.shape.iter().rev().enumerate() {
-            let idx = a.shape.len() - 1 - i;
-            strides[idx] = stride;
-            stride *= *dim as isize;
         }
         Ok(View {
             inner: Arc::new(out_inner),
             offset: 0,
             shape: a.shape.clone(),
-            strides,
+            strides: contiguous_strides(&a.shape),
         })
     }
 
@@ -94,18 +89,11 @@ impl Backend for CpuBackend {
                 BinaryOp::Div => kernels_simd::binary_ops::div(a_slice, b_slice, out_slice),
             }
         }
-        let mut stride = 1isize;
-        let mut strides = vec![0isize; a.shape.len()];
-        for (i, dim) in a.shape.iter().rev().enumerate() {
-            let idx = a.shape.len() - 1 - i;
-            strides[idx] = stride;
-            stride *= *dim as isize;
-        }
         Ok(View {
             inner: Arc::new(out_inner),
             offset: 0,
             shape: a.shape.clone(),
-            strides,
+            strides: contiguous_strides(&a.shape),
         })
     }
 }

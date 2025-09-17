@@ -42,6 +42,23 @@ fn unary_sqrt_matches_scalar() {
 }
 
 #[test]
+fn unary_relu_matches_scalar() {
+    let a = vec_view(vec![-3.0, -0.5, 0.0, 0.5, 2.0, 5.0]);
+    let be = CpuBackend;
+    let out = be.unary(UnaryOp::Relu, &a).unwrap();
+    let actual = out.inner.as_slice(out.offset, out.numel());
+    let expect: Vec<f32> = a
+        .inner
+        .as_slice(a.offset, a.numel())
+        .iter()
+        .map(|x| x.max(0.0))
+        .collect();
+    for (got, exp) in actual.iter().zip(expect.iter()) {
+        assert!((got - exp).abs() < 1e-6);
+    }
+}
+
+#[test]
 fn binary_add_matches_scalar() {
     let a = vec_view((0..130).map(|i| i as f32 * 0.5).collect()); // span SIMD + remainder
     let b = vec_view((0..130).map(|i| i as f32 * -0.25).collect());

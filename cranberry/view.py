@@ -35,7 +35,8 @@ class View:
     return View(shape, stride, offset, contiguous)
 
   def reshape(self, shape: Tuple[int, ...]) -> Optional[View]:
-    if self.shape == shape: return self
+    if self.shape == shape:
+      return self
 
     assert all(x >= 0 for x in shape), f"{shape=} can't contain negative numbers"
     assert prod(self.shape) == prod(shape), f"size mismatched, can't reshape {self.shape=} -> {shape=}"
@@ -86,7 +87,8 @@ class View:
 
     for i in range(len(sizes)):
       if i < len(self.shape):
-        if sizes[i] == self.shape[i]: continue
+        if sizes[i] == self.shape[i]:
+          continue
         if sizes[i] != self.shape[i] and self.shape[i] == 1:
           n_stride[i] = 0  # means this dimension is "broadcasted"
       else:
@@ -100,7 +102,8 @@ class View:
     )
 
   def permute(self, dims: Tuple[int, ...]) -> View:
-    if dims == tuple(range(len(self.shape))): return self
+    if dims == tuple(range(len(self.shape))):
+      return self
 
     if not self.contiguous:
       raise NotImplementedError("permuting non-contiguous views is not supported yet")

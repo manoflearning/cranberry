@@ -1,3 +1,4 @@
+use std::simd::num::SimdFloat;
 use std::simd::{f32x64, StdFloat};
 
 const CHUNK_SIZE: usize = 64;
@@ -32,6 +33,21 @@ pub mod unary_ops {
             .iter()
             .zip(b_rem.iter_mut())
             .for_each(|(a, b)| *b = a.sqrt());
+    }
+
+    pub fn relu(a: &[f32], b: &mut [f32]) {
+        assert!(a.len() == b.len());
+        let (a_main, a_rem) = a.split_at(a.len() - a.len() % CHUNK_SIZE);
+        let (b_main, b_rem) = b.split_at_mut(b.len() - b.len() % CHUNK_SIZE);
+        let zero = f32x64::splat(0.0);
+        a_main
+            .chunks_exact(CHUNK_SIZE)
+            .zip(b_main.chunks_exact_mut(CHUNK_SIZE))
+            .for_each(|(a, b)| f32x64::from_slice(a).simd_max(zero).copy_to_slice(b));
+        a_rem
+            .iter()
+            .zip(b_rem.iter_mut())
+            .for_each(|(a, b)| *b = a.max(0.0));
     }
 
     pub fn exp(a: &[f32], b: &mut [f32]) {
