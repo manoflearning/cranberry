@@ -1,8 +1,24 @@
 from __future__ import annotations
-import math
-from typing import Iterable, List, Optional, Tuple, Union
 
-import numpy as np
+import math
+from typing import Iterable, List, Optional, Tuple, TYPE_CHECKING, Union, Any
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+  import numpy as _np
+
+try:  # pragma: no cover - optional dependency
+  import numpy as np  # type: ignore[assignment]
+except ImportError:  # pragma: no cover - handled gracefully at runtime
+  np = None  # type: ignore[assignment]
+
+HAS_NUMPY = np is not None
+
+
+def _require_numpy() -> Any:
+  if np is None:  # pragma: no cover - optional path
+    raise RuntimeError("NumPy is required for this operation. Install 'cranberry[numpy]' to enable NumPy interoperability.")
+  return np
+
 
 from .cranberry import StorageView
 from cranberry.ops import BinaryOps, MovementOps, Op, ReduceOps, UnaryOps
@@ -34,6 +50,15 @@ def _flatten_list(x: List) -> List[float]:
   return flattened
 
 
+def _reshape_flat(values: List[float], shape: Tuple[int, ...]):
+  if not shape:
+    return values[0] if values else 0.0
+  if len(shape) == 1:
+    return values[: shape[0]]
+  stride = _prod(shape[1:])
+  return [_reshape_flat(values[i * stride : (i + 1) * stride], shape[1:]) for i in range(shape[0])]
+
+
 def _ensure_shape_tuple(shape: Optional[Union[Tuple[int, ...], Shape]]) -> Optional[Tuple[int, ...]]:
   if shape is None:
     return None
@@ -63,7 +88,7 @@ def _contiguous(storage: StorageView) -> StorageView:
 
 
 def _coerce_to_storage(
-  data: Union["Tensor", StorageView, float, int, List, np.ndarray],
+  data: Union["Tensor", StorageView, float, int, List, "_np.ndarray"],
   shape: Optional[Union[Tuple[int, ...], Shape]],
   device: str,
 ) -> Tuple[StorageView, Tuple[int, ...]]:
@@ -107,8 +132,9 @@ def _coerce_to_storage(
     storage = storage.reshape(_shape_to_list(target_shape))
     return storage, target_shape
 
-  if isinstance(data, np.ndarray):
-    arr = np.asarray(data, dtype=np.float32)
+  if np is not None and isinstance(data, np.ndarray):
+    np_mod = _require_numpy()
+    arr = np_mod.asarray(data, dtype=np_mod.float32)
     inferred = tuple(int(dim) for dim in arr.shape)
     flat = arr.reshape(-1).tolist()
     storage = StorageView.from_vec(flat, device)
@@ -125,8 +151,8 @@ def _coerce_to_storage(
 class Tensor:
   def __init__(
     self,
-    data: Union[float, int, List, np.ndarray, StorageView, "Tensor"],
-    grad: Optional[Union[List, np.ndarray, StorageView, "Tensor"]] = None,
+    data: Union[float, int, List, "_np.ndarray", StorageView, "Tensor"],
+    grad: Optional[Union[List, "_np.ndarray", StorageView, "Tensor"]] = None,
     shape: Optional[Union[Tuple[int, ...], Shape]] = None,
     requires_grad: bool = False,
     prev: Optional[Tuple[Tensor, ...]] = None,
@@ -443,31 +469,55 @@ class Tensor:
         if out_grad is None:
           return
         grad = _contiguous(out_grad)
-        input_shape = self.shape or (1,)
-        input_vals = np.array(_contiguous(self._storage).to_vec(), dtype=np.float32).reshape(input_shape)
+        dims = list(self.shape)
 
-        out_shape = out.shape or (1,)
-        max_vals = np.array(_contiguous(out._storage).to_vec(), dtype=np.float32).reshape(out_shape)
-        grad_vals = np.array(grad.to_vec(), dtype=np.float32).reshape(out_shape)
+        if not dims:
+          self._add_grad(grad)
+          return
+
+        grad_expanded = grad
+        if axis is None:
+          if not keepdim:
+            grad_expanded = grad_expanded.reshape([1] * len(dims))
+          grad_expanded = grad_expanded.expand(dims)
+        else:
+          if not keepdim:
+            reshape_shape = dims.copy()
+            reshape_shape[axis] = 1
+            grad_expanded = grad_expanded.reshape(reshape_shape)
+          grad_expanded = grad_expanded.expand(dims)
+
+        input_vals = _contiguous(self._storage).to_vec()
+        mask = [0.0] * len(input_vals)
 
         if axis is None:
-          if not keepdim and len(input_shape) > 0:
-            grad_vals = grad_vals.reshape((1,) * len(input_shape))
-            max_vals = max_vals.reshape((1,) * len(input_shape))
-          grad_broadcast = np.broadcast_to(grad_vals, input_shape)
-          max_broadcast = np.broadcast_to(max_vals, input_shape)
+          if input_vals:
+            max_val = max(input_vals)
+            for idx, val in enumerate(input_vals):
+              if math.isclose(val, max_val, rel_tol=1e-6, abs_tol=1e-6):
+                mask[idx] = 1.0
         else:
-          axis_idx = axis
-          if not keepdim:
-            grad_vals = np.expand_dims(grad_vals, axis_idx)
-            max_vals = np.expand_dims(max_vals, axis_idx)
-          grad_broadcast = np.broadcast_to(grad_vals, input_shape)
-          max_broadcast = np.broadcast_to(max_vals, input_shape)
+          axis_size = dims[axis]
+          outer = _prod(dims[:axis]) if axis > 0 else 1
+          inner = _prod(dims[axis + 1 :]) if axis + 1 < len(dims) else 1
+          for outer_idx in range(outer):
+            for inner_idx in range(inner):
+              best = -float("inf")
+              positions: List[int] = []
+              for axis_idx in range(axis_size):
+                linear = ((outer_idx * axis_size) + axis_idx) * inner + inner_idx
+                val = input_vals[linear]
+                if val > best + 1e-6:
+                  best = val
+                  positions = [linear]
+                elif math.isclose(val, best, rel_tol=1e-6, abs_tol=1e-6):
+                  positions.append(linear)
+              for pos in positions:
+                mask[pos] = 1.0
 
-        mask = np.isclose(input_vals, max_broadcast, rtol=1e-6, atol=1e-6).astype(np.float32)
-        grad_result = (mask * grad_broadcast).astype(np.float32)
-        grad_storage = StorageView.from_vec(grad_result.reshape(-1).tolist(), self._device).reshape(self._shape_list())
-        self._add_grad(grad_storage)
+        mask_storage = StorageView.from_vec(mask, self._device).reshape(self._shape_list())
+        grad_contrib = _contiguous(grad_expanded).mul(_contiguous(mask_storage))
+        self._add_grad(grad_contrib)
 
       out._backward = backward
 
@@ -648,12 +698,17 @@ class Tensor:
       raise ValueError("shape mismatch between predictions and labels")
     y_pred = self.log_softmax()
     num_classes = self.shape[1]
-    onehot = [[0.0] * num_classes for _ in range(Y.shape[0])]
-    labels = Y.numpy().astype(np.int32)
-    for i, label in enumerate(labels):
-      onehot[i][int(label)] = 1.0
-    y_onehot = Tensor(onehot)
-    return -(y_onehot * y_pred).sum() / Y.shape[0]
+    labels_vec = _contiguous(Y._storage).to_vec()
+    batch = len(labels_vec)
+    onehot_data = [0.0] * (batch * num_classes)
+    for i, label_val in enumerate(labels_vec):
+      idx = int(round(label_val))
+      if idx < 0 or idx >= num_classes:
+        raise ValueError(f"label index {idx} is out of bounds for {num_classes} classes")
+      onehot_data[i * num_classes + idx] = 1.0
+    onehot_storage = StorageView.from_vec(onehot_data, self._device).reshape([batch, num_classes])
+    y_onehot = Tensor._from_storage(onehot_storage, requires_grad=False, prev=None, op=None, device=self._device)
+    return -(y_onehot * y_pred).sum() / batch
 
   # ********************************************************
   # ***************          random          ***************
@@ -711,20 +766,22 @@ class Tensor:
   def detach(self) -> Tensor:
     return Tensor._from_storage(self._storage, requires_grad=False, prev=None, op=None, device=self._device)
 
-  def numpy(self) -> np.ndarray:
+  def numpy(self) -> "_np.ndarray":
+    np_mod = _require_numpy()
     contig = _contiguous(self._storage)
-    arr = np.array(contig.to_vec(), dtype=np.float32)
+    arr = np_mod.array(contig.to_vec(), dtype=np_mod.float32)
     return arr.reshape(self.shape) if self.shape else arr.reshape(())
 
   @property
-  def data(self) -> np.ndarray:
+  def data(self) -> "_np.ndarray":
     return self.numpy()
 
   @property
-  def grad(self) -> np.ndarray:
+  def grad(self) -> "_np.ndarray":
+    np_mod = _require_numpy()
     grad_storage = self._ensure_grad()
     contig = _contiguous(grad_storage)
-    arr = np.array(contig.to_vec(), dtype=np.float32)
+    arr = np_mod.array(contig.to_vec(), dtype=np_mod.float32)
     return arr.reshape(self.shape) if self.shape else arr.reshape(())
 
   @property
@@ -753,6 +810,7 @@ class Tensor:
 
   def set_data_storage(self, storage: StorageView):
     self._storage = storage
+    self._shape = _storage_shape(storage)
 
   def num_elements(self) -> int:
     return self._numel()
@@ -767,13 +825,18 @@ class Tensor:
   def item(self) -> float:
     if self.shape != ():
       raise ValueError("item() only supports tensors with a single element")
-    return float(self.numpy().item())
+    values = _contiguous(self._storage).to_vec()
+    return float(values[0]) if values else 0.0
 
   def __hash__(self):
     return id(self)
 
   def __repr__(self):
-    out = f"Tensor({self.numpy().round(4) if self.shape != () else self.item()}"
+    if HAS_NUMPY:
+      display = self.numpy().round(4) if self.shape else self.item()
+    else:
+      display = _reshape_flat(_contiguous(self._storage).to_vec(), self.shape)
+    out = f"Tensor({display}"
     if self._op is not None:
       out += f", op={self._op.__repr__()}"
     return out + ")"
