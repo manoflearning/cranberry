@@ -9,7 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 pyo3 = { version = "0.24.1", features = ["extension-module"] }
-rand = { version = "0.8.5" }
+rand = { version = "0.9.3" }
 rand_distr = "0.4"
 thiserror = "1"
 cudarc = { version = "0.17", optional = true, features = ["driver", "nvrtc", "cuda-version-from-build-system"] }
